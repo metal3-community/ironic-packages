@@ -98,7 +98,7 @@ jobs:
       - name: Get all packages
         id: all-packages
         run: |
-          packages=$(find . -maxdepth 1 -name "py3-*.yaml" \; | sort | jq -R . | jq -s .)
+          packages=$(ls {py3-*,uwsgi}.yaml | sort | jq -R . | jq -s .)
           echo "packages=$packages" >> $GITHUB_OUTPUT
 
       - name: Detect changed packages
