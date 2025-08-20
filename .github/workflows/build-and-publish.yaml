@@ -148,6 +148,8 @@ jobs:
         distro: [alpine, wolfi]
       fail-fast: false
     env:
+      DISTRO_REPOSITORY: '{"alpine":"https://dl-cdn.alpinelinux.org/alpine/edge/main", "wolfi":"https://packages.wolfi.dev/os"}'
+      DISTRO_KEYRING: '{"alpine":"https://alpinelinux.org/keys/alpine-devel@lists.alpinelinux.org-4a6a0840.rsa.pub", "wolfi":"https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"}'
       PACKAGES_TO_BUILD: ${{ needs.detect-changes.outputs.force-rebuild == 'true' && needs.detect-changes.outputs.all-packages || needs.detect-changes.outputs.packages }}
     steps:
       - name: Harden Runner
@@ -157,84 +159,24 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3.2.0
+      - name: Setup Melange
+        uses: chainguard-dev/actions/setup-melange@2cb024c203beac9650fa199c1618e5a729418c70 # v1.4.11
+        with:
+          version: latest-release
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
-
-      - name: Install melange
-        run: |
-          # Install melange from the official releases
-          MELANGE_VERSION="0.30.6"
-          
-          curl -sL "https://github.com/chainguard-dev/melange/releases/download/v${MELANGE_VERSION}/melange_${MELANGE_VERSION}_linux_amd64.tar.gz" | \
-          tar xvz --strip-components=1
-          sudo mv melange /usr/local/bin/
-          chmod +x /usr/local/bin/melange
-
-      - name: Generate signing key
-        run: |
-          melange keygen local-melange.rsa
-
-      - name: Create packages directory structure
-        run: |
-          mkdir -p packages/${{ matrix.distro }}/{x86_64,arm64}
-
-      - name: Build packages for ${{ matrix.distro }} (all architectures)
-        run: |
-          set -euo pipefail
-          
-          # Determine repository and keyring based on distro
-          case "${{ matrix.distro }}" in
-            alpine)
-              REPO_URL="https://dl-cdn.alpinelinux.org/alpine/edge/main"
-              KEYRING_URL="https://alpinelinux.org/keys/alpine-devel@lists.alpinelinux.org-4a6a0840.rsa.pub"
-              ;;
-            wolfi)
-              REPO_URL="https://packages.wolfi.dev/os"
-              KEYRING_URL="https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"
-              ;;
-          esac
-          
-          # Parse packages to build
-          packages=$(echo '${{ env.PACKAGES_TO_BUILD }}' | jq -r '.[]')
-          
-          # Build each package for both architectures
-          for package in $packages; do
-            if [[ -f "${package}.yaml" ]]; then
-              echo "Building ${package} for ${{ matrix.distro }} (x86_64, arm64)"
-              
-              SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct --follow "${package}.yaml" || date +%s)
-              export SOURCE_DATE_EPOCH
-              
-              export GOFLAGS=""
-              export GOTOOLCHAIN=local
-              # Build jemalloc with 64k page support
-              export JEMALLOC_SYS_WITH_LG_PAGE=16
-              
-              # Build for all architectures at once using melange's multi-arch support
-              melange build "${package}.yaml" \
-                --arch x86_64,arm64 \
-                --runner docker \
-                --signing-key local-melange.rsa \
-                --repository-append "$(pwd)/packages/${{ matrix.distro }}" \
-                --keyring-append local-melange.rsa.pub \
-                --repository-append "$REPO_URL" \
-                --keyring-append <(curl -sL "$KEYRING_URL") \
-                --namespace "${{ matrix.distro }}" \
-                --pipeline-dir ./pipelines \
-                --out-dir "./packages/${{ matrix.distro }}" \
-                --log-level info \
-                --generate-index false || {
-                  echo "Failed to build ${package} for ${{ matrix.distro }}" >&2
-                  exit 1
-                }
-            else
-              echo "Warning: ${package}.yaml not found, skipping"
-            fi
-          done
+      - name: Build ${{ matrix.distro }} packages
+        uses: chainguard-dev/actions/melange-build@2cb024c203beac9650fa199c1618e5a729418c70 # v1.4.11
+        with:
+          multi-config: ${{ join(fromJSON(env.PACKAGES_TO_BUILD), ',') }}
+          pipeline-dir: ./pipelines
+          archs: x86_64, arm64
+          sign-with-temporary-key: true
+          repository-append: ${{ fromJson(env.DISTRO_REPOSITORY)[matrix.distro] }}
+          keyring-append: ${{ fromJson(env.DISTRO_KEYRING)[matrix.distro] }}
+          namespace: ${{ matrix.distro }}
 
       - name: Generate APK indexes for ${{ matrix.distro }}
         run: |
