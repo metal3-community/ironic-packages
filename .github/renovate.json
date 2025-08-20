@@ -1,0 +1,104 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:base",
+    ":semanticCommits",
+    ":dependencyDashboard"
+  ],
+  "schedule": [
+    "after 6am and before 6pm on weekdays"
+  ],
+  "timezone": "UTC",
+  "labels": ["dependencies", "automated"],
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 5,
+  "stabilityDays": 1,
+  "vulnerabilityAlerts": {
+    "enabled": true
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update Melange package version and git commit for OpenDev repositories",
+      "fileMatch": ["^py3-.*\\.yaml$"],
+      "matchStrings": [
+        "(?s)package:[\\s\\S]*?version:\\s*[\"']?(?<currentValue>[^\"'\\s\\n]+)[\"']?[\\s\\S]*?repository:\\s*https://opendev\\.org/openstack/(?<depName>\\S+)[\\s\\S]*?expected-commit:\\s*(?<currentDigest>[a-f0-9]{40})"
+      ],
+      "datasourceTemplate": "github-tags",
+      "lookupNameTemplate": "openstack/{{depName}}",
+      "versioningTemplate": "semver",
+      "depNameTemplate": "{{depName}}",
+      "packageNameTemplate": "py3-{{depName}}"
+    },
+    {
+      "customType": "regex",
+      "description": "Update Melange package version and git commit for GitHub repositories",  
+      "fileMatch": ["^py3-.*\\.yaml$"],
+      "matchStrings": [
+        "(?s)package:[\\s\\S]*?version:\\s*[\"']?(?<currentValue>[^\"'\\s\\n]+)[\"']?[\\s\\S]*?repository:\\s*https://github\\.com/(?<depName>[^/\\s]+/[^/\\s]+)[\\s\\S]*?expected-commit:\\s*(?<currentDigest>[a-f0-9]{40})"
+      ],
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "semver",
+      "depNameTemplate": "{{depName}}",
+      "packageNameTemplate": "py3-{{depName}}"
+    },
+    {
+      "customType": "regex",
+      "description": "Update Melange package version for PyPI packages",
+      "fileMatch": ["^py3-.*\\.yaml$"],
+      "matchStrings": [
+        "version:\\s*[\"']?(?<currentValue>[^\"'\\s\\n]+)[\"']?[\\s\\S]*?pypi-package:\\s*(?<depName>\\S+)"
+      ],
+      "datasourceTemplate": "pypi",
+      "depNameTemplate": "{{depName}}",
+      "packageNameTemplate": "py3-{{depName}}"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchFileNames": ["py3-*.yaml"],
+      "commitMessagePrefix": "chore:",
+      "commitMessageTopic": "update {{depName}}",
+      "commitMessageExtra": "to {{newVersion}}",
+      "branchPrefix": "renovate/",
+      "automerge": false,
+      "platformAutomerge": false,
+      "reviewersFromCodeOwners": true,
+      "assignees": ["@metal3-community/maintainers"]
+    },
+    {
+      "matchDatasources": ["pypi"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "platformAutomerge": true,
+      "minimumReleaseAge": "1 day"
+    },
+    {
+      "matchDatasources": ["github-tags"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": false,
+      "platformAutomerge": false
+    },
+    {
+      "matchDatasources": ["github-tags"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "platformAutomerge": false,
+      "labels": ["major-update", "breaking-change"]
+    },
+    {
+      "description": "Enable digest updates for git repositories",
+      "matchDatasources": ["github-tags"],
+      "digest": {
+        "enabled": true
+      },
+      "separateMinorPatch": false,
+      "separateMajorMinor": false
+    }
+  ],
+  "git": {
+    "ignoredAuthors": ["renovate[bot]@users.noreply.github.com"]
+  },
+  "onboarding": false,
+  "requireConfig": "optional"
+}
