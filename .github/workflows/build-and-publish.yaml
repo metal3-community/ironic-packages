@@ -98,7 +98,7 @@ jobs:
       - name: Get all packages
         id: all-packages
         run: |
-          packages="$(find . -maxdepth 1 -type f \( -iname 'py3-*.yaml' -o -name uwsgi.yaml \) -exec basename {} .yaml \; | jq -R | jq -sc)"
+          packages="$(ls {py3-*,uwsgi}.yaml | jq -R | jq -sc)"
           echo "packages=${packages}" >> $GITHUB_OUTPUT
 
       - name: Detect changed packages
@@ -125,7 +125,7 @@ jobs:
           
           for file in $changed_files; do
             if [[ $file =~ ^py3-.*\.yaml$ ]]; then
-              package=$(basename "$file" .yaml)
+              package="$file"
               packages+=("$package")
             fi
           done
