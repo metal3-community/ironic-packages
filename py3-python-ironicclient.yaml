@@ -1,0 +1,100 @@
+package:
+  name: py3-ironic-python-agent
+  description: OpenStack Bare Metal Provisioning Agent
+  version: 11.1.0
+  epoch: 1
+  target-architecture:
+  - all
+  copyright:
+  - license: Apache-2.0
+  dependencies:
+    provider-priority: 0
+
+vars:
+  pypi-package: ironic-python-agent
+  import: ironicclient
+
+data:
+- name: py-versions
+  items:
+    3.10: '310'
+    3.11: '311'
+    3.12: '312'
+    3.13: '313'
+
+environment:
+  contents:
+    packages:
+    - py3-supported-build-base
+    - py3-supported-pbr
+    - py3-supported-pbr
+    - py3-supported-setuptools
+    - py3-supported-wheel
+
+pipeline:
+- uses: git-checkout
+  with:
+    repository: https://opendev.org/openstack/ironic-python-agent
+    tag: ${{package.version}}
+    expected-commit: 07f8c0767482df32bac9a00945ce56fbbf5e6729
+- uses: py/validate-pbr-version
+
+subpackages:
+- range: py-versions
+  name: py${{range.key}}-${{vars.pypi-package}}
+  description: python${{range.key}} version of ${{vars.pypi-package}}
+  dependencies:
+    provider-priority: ${{range.value}}
+    provides:
+    - py3-${{vars.pypi-package}}
+    runtime:
+    - py${{range.key}}-pbr=~6.1.0 # Apache-2.0
+    - py${{range.key}}-oslo-config=~9.7.1 # Apache-2.0
+    - py${{range.key}}-oslo-concurrency=~7.1.0 # Apache-2.0
+    - py${{range.key}}-oslo-log=~7.1.0 # Apache-2.0
+    - py${{range.key}}-oslo-utils=~8.2.0 # Apache-2.0
+    - py${{range.key}}-pint=~0.5 # BSD
+    - py${{range.key}}-psutil=~3.2.2 # BSD
+    - py${{range.key}}-pyudev=~0.18 # LGPLv2.1+
+    - py${{range.key}}-requests=~2.14.2 # Apache-2.0
+    - py${{range.key}}-stevedore=~1.20.0 # Apache-2.0
+    - py${{range.key}}-tenacity=~6.2.0 # Apache-2.0
+    - py${{range.key}}-werkzeug=~2.0.0 # BSD License
+    - py${{range.key}}-cryptography=~2.3 # BSD/Apache-2.0
+    - py${{range.key}}-tooz=~2.7.2 # Apache-2.0
+    - py${{range.key}}-zeroconf=~0.24.0 # LGPL
+    - py${{range.key}}-cheroot=~10.0.1 # BSD
+  pipeline:
+  - uses: py/build-wheel
+    with:
+      python: python${{range.key}}
+  - uses: strip
+  test:
+    pipeline:
+    - uses: python/import
+      with:
+        python: python${{range.key}}
+        imports: |
+          import ${{vars.import}}
+
+- name: py3-supported-${{vars.pypi-package}}
+  description: meta package providing ${{vars.pypi-package}} for supported python versions.
+  dependencies:
+    runtime:
+    - py3.10-${{vars.pypi-package}}
+    - py3.11-${{vars.pypi-package}}
+    - py3.12-${{vars.pypi-package}}
+    - py3.13-${{vars.pypi-package}}
+
+test:
+  pipeline:
+  - uses: python/import
+    with:
+      imports: |
+        import ${{vars.import}}
+update:
+  enabled: true
+  git:
+    identifier: openstack/ironic-python-agent
+  schedule:
+    period: daily

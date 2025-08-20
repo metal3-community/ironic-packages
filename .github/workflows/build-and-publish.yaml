@@ -1,0 +1,426 @@
+name: Build and Publish APK Repository
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '*.yaml'
+      - 'pipelines/**'
+      - 'recipes/**'
+      - 'Makefile'
+      - 'build*.env'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '*.yaml'
+      - 'pipelines/**'
+      - 'recipes/**'
+      - 'Makefile'
+      - 'build*.env'
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force rebuild all packages'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  detect-changes:
+    name: Detect Package Changes
+    runs-on: ubuntu-latest
+    if: github.repository == 'metal3-community/ironic-packages'
+    outputs:
+      packages: ${{ steps.changes.outputs.packages }}
+      all-packages: ${{ steps.all-packages.outputs.packages }}
+      force-rebuild: ${{ steps.check-force.outputs.force }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Check force rebuild
+        id: check-force
+        run: |
+          if [[ "${{ github.event.inputs.force_rebuild }}" == "true" || "${{ github.event_name }}" == "push" ]]; then
+            echo "force=true" >> $GITHUB_OUTPUT
+          else
+            echo "force=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get all packages
+        id: all-packages
+        run: |
+          packages=$(find . -maxdepth 1 -name "py3-*.yaml" -exec basename {} .yaml \; | sort | jq -R . | jq -s .)
+          echo "packages=$packages" >> $GITHUB_OUTPUT
+
+      - name: Detect changed packages
+        id: changes
+        if: steps.check-force.outputs.force == 'false'
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base_ref="${{ github.event.pull_request.base.sha }}"
+          else
+            base_ref="HEAD~1"
+          fi
+          
+          changed_files=$(git diff --name-only $base_ref HEAD | grep -E '\.(yaml)$' || true)
+          packages=()
+          
+          for file in $changed_files; do
+            if [[ $file =~ ^py3-.*\.yaml$ ]]; then
+              package=$(basename "$file" .yaml)
+              packages+=("$package")
+            fi
+          done
+          
+          if [[ ${#packages[@]} -eq 0 ]]; then
+            echo "packages=[]" >> $GITHUB_OUTPUT
+          else
+            printf -v joined '%s\n' "${packages[@]}"
+            echo "$joined" | jq -R . | jq -s . > packages.json
+            echo "packages=$(cat packages.json)" >> $GITHUB_OUTPUT
+          fi
+
+  build-packages:
+    name: Build APK Packages
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: github.repository == 'metal3-community/ironic-packages' && (needs.detect-changes.outputs.force-rebuild == 'true' || needs.detect-changes.outputs.packages != '[]')
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+        distro: [alpine, wolfi]
+      fail-fast: false
+    env:
+      PACKAGES_TO_BUILD: ${{ needs.detect-changes.outputs.force-rebuild == 'true' && needs.detect-changes.outputs.all-packages || needs.detect-changes.outputs.packages }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3.2.0
+        if: matrix.arch == 'aarch64'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3.7.1
+
+      - name: Install melange
+        run: |
+          # Install melange from the official releases
+          MELANGE_VERSION="v0.19.2"
+          
+          curl -LO "https://github.com/chainguard-dev/melange/releases/download/${MELANGE_VERSION}/melange_${MELANGE_VERSION#v}_linux_amd64.tar.gz"
+          tar -xzf "melange_${MELANGE_VERSION#v}_linux_amd64.tar.gz"
+          sudo mv melange /usr/local/bin/
+          chmod +x /usr/local/bin/melange
+
+      - name: Generate signing key
+        run: |
+          melange keygen local-melange.rsa
+
+      - name: Create packages directory
+        run: |
+          mkdir -p packages/${{ matrix.arch }}
+
+      - name: Build packages
+        run: |
+          set -euo pipefail
+          
+          # Determine repository and keyring based on distro
+          case "${{ matrix.distro }}" in
+            alpine)
+              REPO_URL="https://dl-cdn.alpinelinux.org/alpine/edge/main"
+              KEYRING_URL="https://alpinelinux.org/keys/alpine-devel@lists.alpinelinux.org-4a6a0840.rsa.pub"
+              ;;
+            wolfi)
+              REPO_URL="https://packages.wolfi.dev/os"
+              KEYRING_URL="https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"
+              ;;
+          esac
+          
+          # Parse packages to build
+          packages=$(echo '${{ env.PACKAGES_TO_BUILD }}' | jq -r '.[]')
+          
+          # Build each package
+          for package in $packages; do
+            if [[ -f "${package}.yaml" ]]; then
+              echo "Building ${package} for ${{ matrix.arch }} on ${{ matrix.distro }}"
+              
+              SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct --follow "${package}.yaml" || date +%s)
+              export SOURCE_DATE_EPOCH
+              
+              melange build "${package}.yaml" \
+                --arch "${{ matrix.arch }}" \
+                --signing-key local-melange.rsa \
+                --repository-append "$(pwd)/packages" \
+                --keyring-append local-melange.rsa.pub \
+                --repository-append "$REPO_URL" \
+                --keyring-append <(curl -sL "$KEYRING_URL") \
+                --env-file "build-${{ matrix.arch }}.env" \
+                --namespace "${{ matrix.distro }}" \
+                --pipeline-dir ./pipelines \
+                --out-dir ./packages \
+                --log-level info \
+                --generate-index false || {
+                  echo "Failed to build ${package}" >&2
+                  exit 1
+                }
+            else
+              echo "Warning: ${package}.yaml not found, skipping"
+            fi
+          done
+
+      - name: Generate APK index
+        run: |
+          if [[ -d "packages/${{ matrix.arch }}" ]] && [[ $(ls -1 packages/${{ matrix.arch }}/*.apk 2>/dev/null | wc -l) -gt 0 ]]; then
+            # Create APKINDEX for the packages
+            cd "packages/${{ matrix.arch }}"
+            melange index --merge \
+              --signing-key "../../local-melange.rsa" \
+              --output APKINDEX.tar.gz \
+              *.apk || true
+          fi
+
+      - name: Upload packages artifact
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: packages-${{ matrix.distro }}-${{ matrix.arch }}
+          path: packages/${{ matrix.arch }}/
+          retention-days: 30
+
+  publish-repository:
+    name: Publish APK Repository to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-packages]
+    if: github.repository == 'metal3-community/ironic-packages' && github.ref == 'refs/heads/main' && (needs.detect-changes.outputs.force-rebuild == 'true' || needs.detect-changes.outputs.packages != '[]')
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download all package artifacts
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          path: artifacts/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+
+      - name: Organize repository structure
+        run: |
+          mkdir -p repository
+          
+          # Create directory structure for both distros and architectures
+          for distro in alpine wolfi; do
+            for arch in x86_64 aarch64; do
+              mkdir -p "repository/${distro}/${arch}"
+              
+              # Copy packages if artifact exists
+              if [[ -d "artifacts/packages-${distro}-${arch}" ]]; then
+                cp -r "artifacts/packages-${distro}-${arch}/"* "repository/${distro}/${arch}/" || true
+              fi
+            done
+          done
+
+      - name: Generate repository metadata
+        run: |
+          # Create index.html for the repository
+          cat > repository/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Metal3 Ironic APK Repository</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 40px; }
+                  .container { max-width: 800px; margin: 0 auto; }
+                  .repo-url { background: #f4f4f4; padding: 15px; border-radius: 5px; margin: 20px 0; font-family: monospace; }
+                  .distro { margin: 30px 0; }
+                  .arch-list { margin-left: 20px; }
+                  .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                  a { color: #0366d6; text-decoration: none; }
+                  a:hover { text-decoration: underline; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>Metal3 Ironic APK Repository</h1>
+                  <p>This repository contains APK packages for OpenStack Ironic and its dependencies, built for both Alpine Linux and Wolfi.</p>
+                  
+                  <div class="warning">
+                      <strong>⚠️ Note:</strong> This is an unofficial repository. Use at your own discretion.
+                  </div>
+                  
+                  <h2>Available Distributions</h2>
+          EOF
+          
+          for distro in alpine wolfi; do
+            echo "        <div class='distro'>" >> repository/index.html
+            echo "          <h3>$(echo $distro | tr '[:lower:]' '[:upper:]')</h3>" >> repository/index.html
+            echo "          <div class='arch-list'>" >> repository/index.html
+            
+            for arch in x86_64 aarch64; do
+              if [[ -d "repository/${distro}/${arch}" ]] && [[ $(ls -1 repository/${distro}/${arch}/*.apk 2>/dev/null | wc -l) -gt 0 ]]; then
+                echo "            <p><a href='./${distro}/${arch}/'>${arch}</a> - $(ls -1 repository/${distro}/${arch}/*.apk 2>/dev/null | wc -l) packages</p>" >> repository/index.html
+              fi
+            done
+            
+            echo "          </div>" >> repository/index.html
+            echo "        </div>" >> repository/index.html
+          done
+          
+          cat >> repository/index.html << 'EOF'
+                  
+                  <h2>Repository URLs</h2>
+                  <p>To use this repository, add the following URLs to your APK configuration:</p>
+                  
+                  <div class="repo-url">
+                  Alpine x86_64: https://metal3-community.github.io/ironic-image/alpine/x86_64<br>
+                  Alpine aarch64: https://metal3-community.github.io/ironic-image/alpine/aarch64<br>
+                  Wolfi x86_64: https://metal3-community.github.io/ironic-image/wolfi/x86_64<br>
+                  Wolfi aarch64: https://metal3-community.github.io/ironic-image/wolfi/aarch64
+                  </div>
+                  
+                  <h2>Usage</h2>
+                  <p>Add the repository to your APK configuration:</p>
+                  <div class="repo-url">
+                  echo "https://metal3-community.github.io/ironic-image/alpine/x86_64" >> /etc/apk/repositories<br>
+                  apk update
+                  </div>
+                  
+                  <p>Last updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')</p>
+                  <p>Source: <a href="https://github.com/metal3-community/ironic-packages">github.com/metal3-community/ironic-packages</a></p>
+              </div>
+          </body>
+          </html>
+          EOF
+          
+          # Create directory index files for each distribution/architecture
+          for distro in alpine wolfi; do
+            for arch in x86_64 aarch64; do
+              if [[ -d "repository/${distro}/${arch}" ]]; then
+                cat > "repository/${distro}/${arch}/index.html" << EOF
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>${distro^} ${arch} - Metal3 Ironic APK Repository</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 40px; }
+                  .container { max-width: 800px; margin: 0 auto; }
+                  table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                  th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+                  th { background-color: #f2f2f2; }
+                  .back-link { margin-bottom: 20px; }
+                  a { color: #0366d6; text-decoration: none; }
+                  a:hover { text-decoration: underline; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="back-link">
+                      <a href="../../">← Back to main repository</a>
+                  </div>
+                  
+                  <h1>${distro^} ${arch} Packages</h1>
+                  
+                  <table>
+                      <thead>
+                          <tr>
+                              <th>Package</th>
+                              <th>Size</th>
+                              <th>Modified</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+          EOF
+                
+                if [[ -f "repository/${distro}/${arch}/APKINDEX.tar.gz" ]]; then
+                  file="APKINDEX.tar.gz"
+                  size=$(stat -f%z "repository/${distro}/${arch}/${file}" 2>/dev/null || stat -c%s "repository/${distro}/${arch}/${file}" 2>/dev/null || echo "0")
+                  mod_time=$(stat -f%Sm "repository/${distro}/${arch}/${file}" 2>/dev/null || stat -c%y "repository/${distro}/${arch}/${file}" 2>/dev/null || echo "unknown")
+                  echo "                          <tr><td><a href='./${file}'>${file}</a></td><td>${size} bytes</td><td>${mod_time}</td></tr>" >> "repository/${distro}/${arch}/index.html"
+                fi
+                
+                for file in repository/${distro}/${arch}/*.apk; do
+                  if [[ -f "$file" ]]; then
+                    filename=$(basename "$file")
+                    size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
+                    mod_time=$(stat -f%Sm "$file" 2>/dev/null || stat -c%y "$file" 2>/dev/null || echo "unknown")
+                    echo "                          <tr><td><a href='./${filename}'>${filename}</a></td><td>${size} bytes</td><td>${mod_time}</td></tr>" >> "repository/${distro}/${arch}/index.html"
+                  fi
+                done
+                
+                cat >> "repository/${distro}/${arch}/index.html" << 'EOF'
+                      </tbody>
+                  </table>
+                  
+                  <p>Last updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')</p>
+              </div>
+          </body>
+          </html>
+          EOF
+              fi
+            done
+          done
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: repository/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+
+  cleanup:
+    name: Cleanup old artifacts
+    runs-on: ubuntu-latest
+    needs: [publish-repository]
+    if: always() && github.repository == 'metal3-community/ironic-packages'
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        with:
+          egress-policy: audit
+
+      - name: Delete workflow artifacts
+        uses: geekyeggo/delete-artifact@f275313e70c08f6120db482d7a6b98377786765b # v5.1.0
+        with:
+          name: |
+            packages-alpine-x86_64
+            packages-alpine-aarch64
+            packages-wolfi-x86_64
+            packages-wolfi-aarch64
+          failOnError: false

@@ -1,0 +1,6 @@
+ironic @ git+https://opendev.org/openstack/ironic.git@31.0.0
+ironic-prometheus-exporter
+proliantutils
+PyMySQL>=0.8.0
+python-scciclient
+sushy
