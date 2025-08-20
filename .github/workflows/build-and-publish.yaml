@@ -49,7 +49,7 @@ jobs:
       force-rebuild: ${{ steps.check-force.outputs.force }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           egress-policy: audit
 
@@ -115,7 +115,7 @@ jobs:
       PACKAGES_TO_BUILD: ${{ needs.detect-changes.outputs.force-rebuild == 'true' && needs.detect-changes.outputs.all-packages || needs.detect-changes.outputs.packages }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           egress-policy: audit
 
@@ -220,7 +220,7 @@ jobs:
     if: github.repository == 'metal3-community/ironic-packages' && github.ref == 'refs/heads/main' && (needs.detect-changes.outputs.force-rebuild == 'true' || needs.detect-changes.outputs.packages != '[]')
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           egress-policy: audit
 
@@ -411,7 +411,7 @@ jobs:
     if: always() && github.repository == 'metal3-community/ironic-packages'
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           egress-policy: audit
 
