@@ -1,0 +1,460 @@
+name: Auto Update Package Versions
+
+on:
+  schedule:
+    # Run twice daily at 6 AM and 6 PM UTC
+    - cron: '0 6,18 * * *'
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Specific package to update (optional)'
+        required: false
+        type: string
+      force:
+        description: 'Force update even if no new version'
+        required: false
+        default: false
+        type: boolean
+      auto_merge:
+        description: 'Auto-merge patch updates'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  check-updates:
+    name: Check for Package Updates
+    runs-on: ubuntu-latest
+    if: github.repository == 'metal3-community/ironic-packages'
+    outputs:
+      updates: ${{ steps.check.outputs.updates }}
+      has-updates: ${{ steps.check.outputs.has-updates }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pyyaml packaging gitpython
+
+      - name: Check for package updates
+        id: check
+        run: |
+          python3 << 'EOF'
+          import os
+          import json
+          import yaml
+          import requests
+          import re
+          from packaging import version
+          from pathlib import Path
+          import subprocess
+          
+          def get_openstack_releases():
+              """Get OpenStack release information from governance repo"""
+              try:
+                  url = "https://opendev.org/openstack/governance/raw/branch/master/reference/projects.yaml"
+                  response = requests.get(url, timeout=30)
+                  response.raise_for_status()
+                  return yaml.safe_load(response.text)
+              except Exception as e:
+                  print(f"Warning: Could not fetch OpenStack projects: {e}")
+                  return {}
+          
+          def get_latest_git_tag(repo_url):
+              """Get latest git tag from repository"""
+              try:
+                  # Convert OpenDev URL to GitHub API if needed
+                  if "opendev.org" in repo_url:
+                      project = repo_url.split("/")[-1]
+                      api_url = f"https://api.github.com/repos/openstack/{project}/tags"
+                  else:
+                      # Convert git URL to GitHub API URL
+                      parts = repo_url.replace("https://github.com/", "").split("/")
+                      if len(parts) >= 2:
+                          api_url = f"https://api.github.com/repos/{parts[0]}/{parts[1]}/tags"
+                      else:
+                          return None
+                  
+                  response = requests.get(api_url, timeout=30)
+                  if response.status_code != 200:
+                      return None
+                  
+                  tags = response.json()
+                  if not tags:
+                      return None
+                  
+                  # Filter out non-semantic version tags and find latest
+                  version_tags = []
+                  for tag in tags:
+                      tag_name = tag["name"]
+                      # Remove common prefixes
+                      clean_tag = re.sub(r'^[vV]?', '', tag_name)
+                      try:
+                          ver = version.parse(clean_tag)
+                          if not ver.is_prerelease:
+                              version_tags.append((ver, tag_name))
+                      except:
+                          continue
+                  
+                  if version_tags:
+                      version_tags.sort(reverse=True)
+                      return str(version_tags[0][0])
+                  
+                  return None
+              except Exception as e:
+                  print(f"Error fetching tags for {repo_url}: {e}")
+                  return None
+          
+          def get_commit_for_tag(repo_url, tag):
+              """Get commit hash for a specific tag"""
+              try:
+                  if "opendev.org" in repo_url:
+                      project = repo_url.split("/")[-1]
+                      # Try both tag formats for OpenStack projects
+                      for tag_variant in [tag, f"v{tag}"]:
+                          api_url = f"https://api.github.com/repos/openstack/{project}/git/refs/tags/{tag_variant}"
+                          response = requests.get(api_url, timeout=30)
+                          if response.status_code == 200:
+                              tag_data = response.json()
+                              # Get the commit from the tag object
+                              object_url = tag_data['object']['url']
+                              object_response = requests.get(object_url, timeout=30)
+                              if object_response.status_code == 200:
+                                  object_data = object_response.json()
+                                  if object_data.get('type') == 'tag':
+                                      # Annotated tag, get the commit it points to
+                                      return object_data['object']['sha']
+                                  else:
+                                      # Direct commit reference
+                                      return object_data['sha']
+                  else:
+                      # GitHub repository
+                      parts = repo_url.replace("https://github.com/", "").split("/")
+                      if len(parts) >= 2:
+                          for tag_variant in [tag, f"v{tag}"]:
+                              api_url = f"https://api.github.com/repos/{parts[0]}/{parts[1]}/git/refs/tags/{tag_variant}"
+                              response = requests.get(api_url, timeout=30)
+                              if response.status_code == 200:
+                                  tag_data = response.json()
+                                  object_url = tag_data['object']['url']
+                                  object_response = requests.get(object_url, timeout=30)
+                                  if object_response.status_code == 200:
+                                      object_data = object_response.json()
+                                      if object_data.get('type') == 'tag':
+                                          return object_data['object']['sha']
+                                      else:
+                                          return object_data['sha']
+                  
+                  return None
+              except Exception as e:
+                  print(f"Error fetching commit for tag {tag}: {e}")
+                  return None
+          
+          def get_pypi_version(package_name):
+              """Get latest version from PyPI"""
+              try:
+                  response = requests.get(f"https://pypi.org/pypi/{package_name}/json", timeout=30)
+                  if response.status_code == 200:
+                      data = response.json()
+                      return data["info"]["version"]
+              except Exception as e:
+                  print(f"Error fetching PyPI version for {package_name}: {e}")
+              return None
+          
+          def check_package_update(package_file):
+              """Check if a package needs updating"""
+              try:
+                  with open(package_file, 'r') as f:
+                      package_data = yaml.safe_load(f)
+                  
+                  current_version = package_data.get('package', {}).get('version')
+                  if not current_version:
+                      return None
+                  
+                  pypi_package = package_data.get('vars', {}).get('pypi-package')
+                  git_repo = None
+                  
+                  # Extract git repository from pipeline
+                  pipeline = package_data.get('pipeline', [])
+                  for step in pipeline:
+                      if step.get('uses') == 'git-checkout' and 'with' in step:
+                          git_repo = step['with'].get('repository')
+                          break
+                  
+                  latest_version = None
+                  source = None
+                  
+                  # Try to get version from git repository first
+                  if git_repo:
+                      latest_version = get_latest_git_tag(git_repo)
+                      source = 'git'
+                  
+                  # Fall back to PyPI if git fails and we have a PyPI package name
+                  if not latest_version and pypi_package:
+                      latest_version = get_pypi_version(pypi_package)
+                      source = 'pypi'
+                  
+                  if not latest_version:
+                      return None
+                  
+                  try:
+                      current_ver = version.parse(current_version)
+                      latest_ver = version.parse(latest_version)
+                      
+                      if latest_ver > current_ver:
+                          return {
+                              'package': package_file.stem,
+                              'current_version': current_version,
+                              'latest_version': latest_version,
+                              'source': source,
+                              'git_repo': git_repo,
+                              'pypi_package': pypi_package
+                          }
+                  except Exception as e:
+                      print(f"Error comparing versions for {package_file}: {e}")
+                  
+                  return None
+              except Exception as e:
+                  print(f"Error processing {package_file}: {e}")
+                  return None
+          
+          # Main execution
+          updates = []
+          specific_package = os.environ.get('SPECIFIC_PACKAGE', '').strip()
+          force_update = os.environ.get('FORCE_UPDATE', 'false').lower() == 'true'
+          
+          # Find all package YAML files
+          package_files = list(Path('.').glob('py3-*.yaml'))
+          
+          if specific_package:
+              package_files = [f for f in package_files if f.stem == specific_package]
+              if not package_files:
+                  print(f"Package {specific_package} not found")
+                  exit(1)
+          
+          print(f"Checking {len(package_files)} packages for updates...")
+          
+          for package_file in sorted(package_files):
+              print(f"Checking {package_file.stem}...")
+              update_info = check_package_update(package_file)
+              
+              if update_info:
+                  print(f"  Update available: {update_info['current_version']} -> {update_info['latest_version']}")
+                  updates.append(update_info)
+              elif force_update and specific_package:
+                  # Force update for specific package even if no new version
+                  with open(package_file, 'r') as f:
+                      package_data = yaml.safe_load(f)
+                  current_version = package_data.get('package', {}).get('version')
+                  updates.append({
+                      'package': package_file.stem,
+                      'current_version': current_version,
+                      'latest_version': current_version,
+                      'source': 'forced',
+                      'git_repo': None,
+                      'pypi_package': package_data.get('vars', {}).get('pypi-package')
+                  })
+              else:
+                  print(f"  No update needed")
+          
+          # Output results
+          if updates:
+              print(f"\nFound {len(updates)} packages to update:")
+              for update in updates:
+                  print(f"  - {update['package']}: {update['current_version']} -> {update['latest_version']}")
+          else:
+              print("\nNo package updates found")
+          
+          # Set GitHub outputs
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"updates={json.dumps(updates)}\n")
+              f.write(f"has-updates={'true' if updates else 'false'}\n")
+          EOF
+        env:
+          SPECIFIC_PACKAGE: ${{ github.event.inputs.package }}
+          FORCE_UPDATE: ${{ github.event.inputs.force }}
+
+  update-packages:
+    name: Update Package Definitions
+    runs-on: ubuntu-latest
+    needs: check-updates
+    if: needs.check-updates.outputs.has-updates == 'true'
+    strategy:
+      matrix:
+        update: ${{ fromJson(needs.check-updates.outputs.updates) }}
+      max-parallel: 5
+      fail-fast: false
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@91182cccc01eb5e619899d80e4e971d6181294a7 # v2.10.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml requests
+
+      - name: Update package definition
+        run: |
+          python3 << 'EOF'
+          import yaml
+          import requests
+          import re
+          import json
+          import os
+          
+          # Get update info from matrix
+          update_info = json.loads('''${{ toJson(matrix.update) }}''')
+          package_name = update_info['package']
+          new_version = update_info['latest_version']
+          git_repo = update_info.get('git_repo')
+          
+          package_file = f"{package_name}.yaml"
+          
+          print(f"Updating {package_name} to version {new_version}")
+          
+          # Read current package definition
+          with open(package_file, 'r') as f:
+              content = f.read()
+              package_data = yaml.safe_load(content)
+          
+          # Update version
+          package_data['package']['version'] = new_version
+          
+          # Get new commit hash if it's a git repository
+          new_commit = None
+          if git_repo and update_info['source'] == 'git':
+              try:
+                  def get_commit_for_tag_local(repo_url, tag):
+                      """Get commit hash for a specific tag"""
+                      try:
+                          if "opendev.org" in repo_url:
+                              project = repo_url.split("/")[-1]
+                              # Try both tag formats for OpenStack projects
+                              for tag_variant in [tag, f"v{tag}"]:
+                                  api_url = f"https://api.github.com/repos/openstack/{project}/git/refs/tags/{tag_variant}"
+                                  response = requests.get(api_url, timeout=30)
+                                  if response.status_code == 200:
+                                      tag_data = response.json()
+                                      # Get the commit from the tag object
+                                      object_url = tag_data['object']['url']
+                                      object_response = requests.get(object_url, timeout=30)
+                                      if object_response.status_code == 200:
+                                          object_data = object_response.json()
+                                          if object_data.get('type') == 'tag':
+                                              # Annotated tag, get the commit it points to
+                                              return object_data['object']['sha']
+                                          else:
+                                              # Direct commit reference
+                                              return object_data['sha']
+                          else:
+                              # GitHub repository
+                              parts = repo_url.replace("https://github.com/", "").split("/")
+                              if len(parts) >= 2:
+                                  for tag_variant in [tag, f"v{tag}"]:
+                                      api_url = f"https://api.github.com/repos/{parts[0]}/{parts[1]}/git/refs/tags/{tag_variant}"
+                                      response = requests.get(api_url, timeout=30)
+                                      if response.status_code == 200:
+                                          tag_data = response.json()
+                                          object_url = tag_data['object']['url']
+                                          object_response = requests.get(object_url, timeout=30)
+                                          if object_response.status_code == 200:
+                                              object_data = object_response.json()
+                                              if object_data.get('type') == 'tag':
+                                                  return object_data['object']['sha']
+                                              else:
+                                                  return object_data['sha']
+                          
+                          return None
+                      except Exception as e:
+                          print(f"Error fetching commit for tag {tag}: {e}")
+                          return None
+                  
+                  new_commit = get_commit_for_tag_local(git_repo, new_version)
+                  if new_commit:
+                      print(f"Found commit hash for tag {new_version}: {new_commit}")
+              except Exception as e:
+                  print(f"Warning: Could not fetch commit hash: {e}")
+          
+          # Update the file content manually to preserve formatting and comments
+          lines = content.split('\n')
+          for i, line in enumerate(lines):
+              # Update version line
+              if re.match(r'\s*version:\s*', line):
+                  indent = re.match(r'^(\s*)', line).group(1)
+                  lines[i] = f"{indent}version: {new_version}"
+              
+              # Update expected-commit if we have a new commit hash
+              elif new_commit and re.match(r'\s*expected-commit:\s*', line):
+                  indent = re.match(r'^(\s*)', line).group(1)
+                  lines[i] = f"{indent}expected-commit: {new_commit}"
+          
+          # Write updated content
+          with open(package_file, 'w') as f:
+              f.write('\n'.join(lines))
+          
+          print(f"Updated {package_file}")
+          if new_commit:
+              print(f"Updated expected-commit to: {new_commit}")
+          EOF
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@5e914681df9dc83aa4e4905692ca88beb2f9e91f # v7.0.5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update ${{ matrix.update.package }} to ${{ matrix.update.latest_version }}"
+          title: "chore: update ${{ matrix.update.package }} to ${{ matrix.update.latest_version }}"
+          body: |
+            ## Package Update
+            
+            Automatically updating `${{ matrix.update.package }}` from `${{ matrix.update.current_version }}` to `${{ matrix.update.latest_version }}`.
+            
+            **Source:** ${{ matrix.update.source }}
+            **Repository:** ${{ matrix.update.git_repo || matrix.update.pypi_package }}
+            
+            ### Changes
+            - 📦 Updated package version to `${{ matrix.update.latest_version }}`
+            - 🔧 Updated expected-commit hash (if applicable)
+            
+            ### Verification
+            This update was automatically detected and applied. The CI will build and test the updated package.
+            
+            ---
+            *This PR was created automatically by the package update workflow.*
+          branch: update/${{ matrix.update.package }}-${{ matrix.update.latest_version }}
+          delete-branch: true
+          labels: |
+            automated
+            package-update
+            ${{ matrix.update.package }}

@@ -1,0 +1,264 @@
+name: Setup Repository Index
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run once a week to regenerate index
+    - cron: '0 2 * * 0'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages-setup"
+  cancel-in-progress: false
+
+jobs:
+  setup-pages:
+    name: Setup GitHub Pages Repository Structure
+    runs-on: ubuntu-latest
+    if: github.repository == 'metal3-community/ironic-packages'
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Setup Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+
+      - name: Create initial repository structure
+        run: |
+          mkdir -p repository
+          
+          # Create directory structure for both distros and architectures
+          for distro in alpine wolfi; do
+            for arch in x86_64 aarch64; do
+              mkdir -p "repository/${distro}/${arch}"
+              
+              # Create empty APKINDEX if it doesn't exist
+              touch "repository/${distro}/${arch}/.gitkeep"
+            done
+          done
+          
+          # Generate main index page
+          cat > repository/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Metal3 Ironic APK Repository</title>
+              <style>
+                  body { 
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                      margin: 0;
+                      padding: 0;
+                      background-color: #f8f9fa;
+                      color: #333;
+                  }
+                  .container { 
+                      max-width: 900px; 
+                      margin: 0 auto; 
+                      padding: 40px 20px;
+                  }
+                  .header {
+                      text-align: center;
+                      margin-bottom: 40px;
+                      padding: 30px;
+                      background: white;
+                      border-radius: 8px;
+                      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                  }
+                  .header h1 {
+                      margin: 0 0 10px 0;
+                      color: #2c3e50;
+                      font-size: 2.5em;
+                  }
+                  .header p {
+                      margin: 0;
+                      color: #666;
+                      font-size: 1.1em;
+                  }
+                  .repo-grid {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                      gap: 20px;
+                      margin: 30px 0;
+                  }
+                  .distro-card {
+                      background: white;
+                      border-radius: 8px;
+                      padding: 25px;
+                      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                  }
+                  .distro-card h3 {
+                      margin: 0 0 15px 0;
+                      color: #2c3e50;
+                      font-size: 1.4em;
+                      display: flex;
+                      align-items: center;
+                  }
+                  .distro-card h3::before {
+                      content: '';
+                      width: 20px;
+                      height: 20px;
+                      margin-right: 10px;
+                      border-radius: 3px;
+                  }
+                  .alpine h3::before { background-color: #0d597f; }
+                  .wolfi h3::before { background-color: #ff6b35; }
+                  .arch-links {
+                      display: flex;
+                      flex-direction: column;
+                      gap: 10px;
+                  }
+                  .arch-link {
+                      display: block;
+                      padding: 12px 16px;
+                      background: #f8f9fa;
+                      border-radius: 5px;
+                      text-decoration: none;
+                      color: #495057;
+                      transition: all 0.2s;
+                      border-left: 4px solid #dee2e6;
+                  }
+                  .arch-link:hover {
+                      background: #e9ecef;
+                      border-left-color: #0366d6;
+                      transform: translateX(4px);
+                  }
+                  .usage-section {
+                      background: white;
+                      border-radius: 8px;
+                      padding: 30px;
+                      margin: 30px 0;
+                      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                  }
+                  .usage-section h2 {
+                      margin: 0 0 20px 0;
+                      color: #2c3e50;
+                  }
+                  .code-block {
+                      background: #f1f3f4;
+                      border: 1px solid #e1e5e9;
+                      border-radius: 5px;
+                      padding: 16px;
+                      font-family: 'SFMono-Regular', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+                      font-size: 14px;
+                      overflow-x: auto;
+                      margin: 15px 0;
+                  }
+                  .warning {
+                      background: #fff3cd;
+                      border: 1px solid #ffeaa7;
+                      padding: 16px;
+                      border-radius: 5px;
+                      margin: 20px 0;
+                      border-left: 4px solid #f39c12;
+                  }
+                  .warning strong {
+                      color: #856404;
+                  }
+                  .footer {
+                      text-align: center;
+                      margin-top: 40px;
+                      padding: 20px;
+                      color: #666;
+                      border-top: 1px solid #dee2e6;
+                  }
+                  .footer a {
+                      color: #0366d6;
+                      text-decoration: none;
+                  }
+                  .footer a:hover {
+                      text-decoration: underline;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>🔧 Metal3 Ironic APK Repository</h1>
+                      <p>APK packages for OpenStack Ironic and dependencies, built for Alpine Linux and Wolfi</p>
+                  </div>
+                  
+                  <div class="warning">
+                      <strong>⚠️ Notice:</strong> This is an unofficial community repository. Packages are provided as-is for development and testing purposes.
+                  </div>
+                  
+                  <div class="repo-grid">
+                      <div class="distro-card alpine">
+                          <h3>Alpine Linux</h3>
+                          <p>Compatible with Alpine Linux edge and recent stable releases.</p>
+                          <div class="arch-links">
+                              <a href="./alpine/x86_64/" class="arch-link">
+                                  📦 x86_64 Packages
+                              </a>
+                              <a href="./alpine/aarch64/" class="arch-link">
+                                  📦 aarch64 Packages
+                              </a>
+                          </div>
+                      </div>
+                      
+                      <div class="distro-card wolfi">
+                          <h3>Wolfi</h3>
+                          <p>Compatible with Wolfi Linux and Chainguard Images.</p>
+                          <div class="arch-links">
+                              <a href="./wolfi/x86_64/" class="arch-link">
+                                  📦 x86_64 Packages
+                              </a>
+                              <a href="./wolfi/aarch64/" class="arch-link">
+                                  📦 aarch64 Packages
+                              </a>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <div class="usage-section">
+                      <h2>🚀 Quick Start</h2>
+                      
+                      <h3>Alpine Linux</h3>
+                      <p>Add the repository to your APK configuration:</p>
+                      <div class="code-block">echo "https://metal3-community.github.io/ironic-packages/alpine/x86_64" >> /etc/apk/repositories
+          apk update
+          apk add py3-ironic</div>
+                      
+                      <h3>Wolfi</h3>
+                      <p>For Wolfi-based containers or systems:</p>
+                      <div class="code-block">echo "https://metal3-community.github.io/ironic-packages/wolfi/x86_64" >> /etc/apk/repositories
+          apk update
+          apk add py3-ironic</div>
+                      
+                      <h3>Repository URLs</h3>
+                      <div class="code-block"># Alpine
+          https://metal3-community.github.io/ironic-packages/alpine/x86_64
+          https://metal3-community.github.io/ironic-packages/alpine/aarch64
+          
+          # Wolfi
+          https://metal3-community.github.io/ironic-packages/wolfi/x86_64
+          https://metal3-community.github.io/ironic-packages/wolfi/aarch64</div>
+                  </div>
+                  
+                  <div class="footer">
+                      <p>🔗 Source Code: <a href="https://github.com/metal3-community/ironic-packages">github.com/metal3-community/ironic-packages</a></p>
+                      <p>📅 Last updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')</p>
+                  </div>
+              </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: repository/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
