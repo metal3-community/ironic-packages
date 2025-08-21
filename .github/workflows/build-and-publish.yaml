@@ -140,6 +140,8 @@ jobs:
     if: github.repository == 'metal3-community/ironic-packages' && needs.detect-changes.outputs.packages != '[]'
     env:
       PACKAGES_TO_BUILD: ${{ needs.detect-changes.outputs.packages }}
+      # Map GitHub runner arch to APK arch
+      APK_ARCH: ${{ matrix.arch == 'amd64' && 'x86_64' || 'aarch64' }}
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-22.04' }}
     steps:
       - name: Harden Runner
@@ -180,23 +182,25 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           pattern: packages
-          path: packages/${{ matrix.distro.name }}/${{ matrix.arch }}/
+          path: packages/${{ matrix.distro.name }}/${{ env.APK_ARCH }}/
         continue-on-error: true
 
       - name: Ensure packages directory exists
         run: |
-          mkdir -p packages/${{ matrix.distro.name }}/${{ matrix.arch }}
+          mkdir -p packages/${{ matrix.distro.name }}/${{ env.APK_ARCH }}
 
       - uses: chainguard-dev/actions/melange-keygen@0cda751b114eb55c388e88f7479292668165602a # v1.0.2
         with:
           signing-key-path: ${{ env.SIGNING_KEY_PATH }}
 
       - uses: chainguard-dev/actions/melange-build-pkg@2cb024c203beac9650fa199c1618e5a729418c70 # v1.4.11
+        env:
+          MELANGE_RUNNER: docker  # Use docker runner to avoid bubblewrap issues
         with:
           namespace: ${{ matrix.distro.name }}
           multi-config: ${{ join(fromJSON(env.PACKAGES_TO_BUILD), ',') }}
           # pipeline-dir: ./pipelines
-          archs: ${{ matrix.arch }}
+          archs: ${{ env.APK_ARCH }}
           signing-key-path: ${{ env.SIGNING_KEY_PATH }}
           repository-path: ${{ github.workspace }}/packages/${{ matrix.distro.name }}
           repository-append: |
@@ -205,25 +209,29 @@ jobs:
 
       - name: Generate APK indexes for ${{ matrix.distro.name }}
         run: |
-          packages_dir="packages/${{ matrix.distro.name }}/${{ matrix.arch }}"
+          packages_dir="packages/${{ matrix.distro.name }}/${{ env.APK_ARCH }}"
           if [[ -d "$packages_dir" ]] && [[ $(ls -1 "${packages_dir}"/*.apk 2>/dev/null | wc -l) -gt 0 ]]; then
-            echo "Generating APKINDEX for ${{ matrix.distro.name }}/${{ matrix.arch }}"
-            signing_key="$(readlink -f local-melange.rsa)"
+            echo "Generating APKINDEX for ${{ matrix.distro.name }}/${{ env.APK_ARCH }}"
+            signing_key="$(readlink -f ${{ env.SIGNING_KEY_PATH }})"
             cd "$packages_dir"
+
+            # Remove any existing APKINDEX to avoid merge conflicts
+            rm -f APKINDEX.tar.gz APKINDEX.unsigned.tar.gz
+
+            # Generate new APKINDEX
             melange index \
               --signing-key "${signing_key}" \
-              --merge APKINDEX.tar.gz \
-              *.apk || true
+              *.apk || echo "Warning: Failed to generate APKINDEX, continuing..."
             cd - > /dev/null
           else
-            echo "No packages found for ${{ matrix.distro.name }}/${{ matrix.arch }}, skipping index generation"
+            echo "No packages found for ${{ matrix.distro.name }}/${{ env.APK_ARCH }}, skipping index generation"
           fi
 
       - name: Upload packages artifacts for ${{ matrix.distro.name }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: packages
-          path: packages/${{ matrix.distro.name }}/${{ matrix.arch }}/
+          path: packages/${{ matrix.distro.name }}/${{ env.APK_ARCH }}/
           retention-days: 30
 
   publish-repository:
@@ -268,7 +276,7 @@ jobs:
 
           # Ensure the directory structure exists even if some combinations are empty
           for distro in alpine wolfi; do
-            for arch in x86_64 arm64; do
+            for arch in x86_64 aarch64; do
               mkdir -p "repository/${distro}/${arch}"
             done
           done
@@ -311,7 +319,7 @@ jobs:
             echo "          <h3>$(echo $distro | tr '[:lower:]' '[:upper:]')</h3>" >> repository/index.html
             echo "          <div class='arch-list'>" >> repository/index.html
 
-            for arch in x86_64 arm64; do
+            for arch in x86_64 aarch64; do
               if [[ -d "repository/${distro}/${arch}" ]] && [[ $(ls -1 repository/${distro}/${arch}/*.apk 2>/dev/null | wc -l) -gt 0 ]]; then
                 echo "            <p><a href='./${distro}/${arch}/'>${arch}</a> - $(ls -1 repository/${distro}/${arch}/*.apk 2>/dev/null | wc -l) packages</p>" >> repository/index.html
               fi
@@ -347,7 +355,7 @@ jobs:
 
           # Create directory index files for each distribution/architecture
           for distro in alpine wolfi; do
-            for arch in x86_64 arm64; do
+            for arch in x86_64 aarch64; do
               if [[ -d "repository/${distro}/${arch}" ]]; then
                 cat > "repository/${distro}/${arch}/index.html" << EOF
           <!DOCTYPE html>
