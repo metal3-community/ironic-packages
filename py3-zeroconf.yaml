@@ -15,9 +15,9 @@ environment:
   contents:
     packages:
       - busybox
+      - cython
       - py3-async-timeout
       - py3-build
-      - py3-cython
       - py3-ifaddr
       - py3-installer
       - py3-poetry-core
