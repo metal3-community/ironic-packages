@@ -1,7 +1,7 @@
 package:
   name: py3-oslo-concurrency
   description: Oslo Concurrency library
-  version: 6.1.0
+  version: 7.1.0
   epoch: 1
   target-architecture:
     - all
@@ -28,7 +28,7 @@ pipeline:
     with:
       repository: https://github.com/openstack/oslo.concurrency
       tag: ${{package.version}}
-      expected-commit: 4f60166c72931d436f7df54b23de75a3e67780a5
+      expected-commit: a8a2e48b05de4a139ae152be916c5fe73104cee2
   - uses: python/build-wheel
   - uses: strip
 
