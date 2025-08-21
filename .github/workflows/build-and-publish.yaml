@@ -124,14 +124,20 @@ jobs:
     name: Build APK Packages
     strategy:
       matrix:
-        distro: [alpine, wolfi]
+        distro:
+          - name: alpine
+            repository: |
+              https://dl-cdn.alpinelinux.org/alpine/edge/main
+              https://dl-cdn.alpinelinux.org/alpine/edge/community
+            keyring: ''
+          - name: wolfi
+            repository: https://packages.wolfi.dev/os
+            keyring: https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
         arch: [amd64, arm64]
       fail-fast: false
     needs: detect-changes
     if: github.repository == 'metal3-community/ironic-packages' && needs.detect-changes.outputs.packages != '[]'
     env:
-      DISTRO_REPOSITORY: '{"alpine":"https://dl-cdn.alpinelinux.org/alpine/edge/main", "wolfi":"https://packages.wolfi.dev/os"}'
-      DISTRO_KEYRING: '{"alpine":"https://alpinelinux.org/keys/alpine-devel@lists.alpinelinux.org-4a6a0840.rsa.pub", "wolfi":"https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"}'
       PACKAGES_TO_BUILD: ${{ needs.detect-changes.outputs.packages }}
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-22.04' }}
     steps:
@@ -166,12 +172,12 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           pattern: packages
-          path: packages/${{ matrix.distro }}/${{ matrix.arch }}/
+          path: packages/${{ matrix.distro.name }}/${{ matrix.arch }}/
         continue-on-error: true
 
       - name: Ensure packages directory exists
         run: |
-          mkdir -p packages/${{ matrix.distro }}/${{ matrix.arch }}
+          mkdir -p packages/${{ matrix.distro.name }}/${{ matrix.arch }}
 
       - uses: chainguard-dev/actions/melange-keygen@0cda751b114eb55c388e88f7479292668165602a # v1.0.2
         with:
@@ -179,22 +185,20 @@ jobs:
 
       - uses: chainguard-dev/actions/melange-build-pkg@2cb024c203beac9650fa199c1618e5a729418c70 # v1.4.11
         with:
+          namespace: ${{ matrix.distro.name }}
           multi-config: ${{ join(fromJSON(env.PACKAGES_TO_BUILD), ',') }}
           # pipeline-dir: ./pipelines
           archs: ${{ matrix.arch }}
           signing-key-path: ${{ env.SIGNING_KEY_PATH }}
-          repository-path: ${{ github.workspace }}/packages/${{ matrix.distro }}/${{ matrix.arch }}
-          repository-append: |
-            ${{ fromJson(env.DISTRO_REPOSITORY)[matrix.distro] }}
-          keyring-append: |
-            ${{ fromJson(env.DISTRO_KEYRING)[matrix.distro] }}
-          namespace: ${{ matrix.distro }}
+          repository-path: ${{ github.workspace }}/packages/${{ matrix.distro.name }}/${{ matrix.arch }}
+          repository-append: ${{ matrix.distro.repository }}
+          keyring-append: ${{ matrix.distro.keyring }}
 
-      - name: Generate APK indexes for ${{ matrix.distro }}
+      - name: Generate APK indexes for ${{ matrix.distro.name }}
         run: |
-          packages_dir="packages/${{ matrix.distro }}/${{ matrix.arch }}"
+          packages_dir="packages/${{ matrix.distro.name }}/${{ matrix.arch }}"
           if [[ -d "$packages_dir" ]] && [[ $(ls -1 "${packages_dir}"/*.apk 2>/dev/null | wc -l) -gt 0 ]]; then
-            echo "Generating APKINDEX for ${{ matrix.distro }}/${{ matrix.arch }}"
+            echo "Generating APKINDEX for ${{ matrix.distro.name }}/${{ matrix.arch }}"
             signing_key="$(readlink -f local-melange.rsa)"
             cd "$packages_dir"
             melange index \
@@ -203,14 +207,14 @@ jobs:
               *.apk || true
             cd - > /dev/null
           else
-            echo "No packages found for ${{ matrix.distro }}/${{ matrix.arch }}, skipping index generation"
+            echo "No packages found for ${{ matrix.distro.name }}/${{ matrix.arch }}, skipping index generation"
           fi
 
-      - name: Upload packages artifacts for ${{ matrix.distro }}
+      - name: Upload packages artifacts for ${{ matrix.distro.name }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: packages
-          path: packages/${{ matrix.distro }}/${{ matrix.arch }}/
+          path: packages/${{ matrix.distro.name }}/${{ matrix.arch }}/
           retention-days: 30
 
   publish-repository:
