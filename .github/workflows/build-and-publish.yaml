@@ -129,7 +129,9 @@ jobs:
             repository: |
               https://dl-cdn.alpinelinux.org/alpine/edge/main
               https://dl-cdn.alpinelinux.org/alpine/edge/community
-            keyring: ''
+            keyring: |
+              https://alpinelinux.org/keys/alpine-devel@lists.alpinelinux.org-4a6a0840.rsa.pub
+              https://alpinelinux.org/keys/alpine-devel@lists.alpinelinux.org-616ae350.rsa.pub
           - name: wolfi
             repository: |
               https://packages.wolfi.dev/os
@@ -199,13 +201,13 @@ jobs:
         with:
           namespace: ${{ matrix.distro.name }}
           multi-config: ${{ join(fromJSON(env.PACKAGES_TO_BUILD), ',') }}
-          # pipeline-dir: ./pipelines
           archs: ${{ env.APK_ARCH }}
           signing-key-path: ${{ env.SIGNING_KEY_PATH }}
           repository-path: ${{ github.workspace }}/packages/${{ matrix.distro.name }}
           repository-append: |
             ${{ matrix.distro.repository }}
-          keyring-append: ${{ matrix.distro.keyring }}
+          keyring-append: |
+            ${{ matrix.distro.keyring }}
 
       - name: Generate APK indexes for ${{ matrix.distro.name }}
         run: |
