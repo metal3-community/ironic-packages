@@ -29,7 +29,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/tooz
+      repository: https://github.com/openstack/tooz
       tag: ${{package.version}}
       expected-commit: f3da28364aebb9bf4cb094cd37233452d052376c
   - uses: py/validate-pbr-version
@@ -52,7 +52,7 @@ subpackages:
         - py${{range.key}}-tenacity=~8.3.0
         - py${{range.key}}-voluptuous=~0.15.2
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

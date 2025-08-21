@@ -35,7 +35,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/oslo.context
+      repository: https://github.com/openstack/oslo.context
       tag: ${{package.version}}
       expected-commit: 87e730ff9c9d76b112f492bceb3f3de72c6a4cca
   - uses: py/validate-pbr-version
@@ -52,7 +52,7 @@ subpackages:
         - py${{range.key}}-debtcollector=~3.0.0
         - py${{range.key}}-pbr=~6.1.0
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

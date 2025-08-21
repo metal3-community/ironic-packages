@@ -35,7 +35,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/oslo.serialization
+      repository: https://github.com/openstack/oslo.serialization
       tag: ${{package.version}}
       expected-commit: d99ef9f6dfb0fa3747d682117caac02bb80c75cf
   - uses: py/validate-pbr-version
@@ -54,7 +54,7 @@ subpackages:
         - py${{range.key}}-pbr=~6.1.0
         - py${{range.key}}-tzdata=~2024.1
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

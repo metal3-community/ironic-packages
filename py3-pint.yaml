@@ -44,7 +44,7 @@ subpackages:
       provides:
         - py3-${{vars.pypi-package}}
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

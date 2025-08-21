@@ -35,7 +35,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/oslo.service
+      repository: https://github.com/openstack/oslo.service
       tag: ${{package.version}}
       expected-commit: 979ada7f673d49e0b42c70829d19187eeee379d7
   - uses: py/validate-pbr-version
@@ -63,7 +63,7 @@ subpackages:
         - py${{range.key}}-webob=~1.8.8
         - py${{range.key}}-yappi=~1.6.0
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

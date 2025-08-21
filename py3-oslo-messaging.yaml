@@ -35,7 +35,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/oslo.messaging
+      repository: https://github.com/openstack/oslo.messaging
       tag: ${{package.version}}
       expected-commit: 3803f1527416542e27dfc6f012fdc3cb127d1195
   - uses: py/validate-pbr-version
@@ -67,7 +67,7 @@ subpackages:
         - py${{range.key}}-stevedore=~5.3.0
         - py${{range.key}}-webob=~1.8.8
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

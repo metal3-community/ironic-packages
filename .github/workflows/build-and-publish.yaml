@@ -141,17 +141,18 @@ jobs:
 
   build-packages:
     name: Build APK Packages
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    if: github.repository == 'metal3-community/ironic-packages' && (needs.detect-changes.outputs.force-rebuild == 'true' || needs.detect-changes.outputs.packages != '[]')
     strategy:
       matrix:
         distro: [alpine, wolfi]
+        arch: [amd64, arm64]
       fail-fast: false
+    needs: detect-changes
+    if: github.repository == 'metal3-community/ironic-packages' && (needs.detect-changes.outputs.force-rebuild == 'true' || needs.detect-changes.outputs.packages != '[]')
     env:
       DISTRO_REPOSITORY: '{"alpine":"https://dl-cdn.alpinelinux.org/alpine/edge/main", "wolfi":"https://packages.wolfi.dev/os"}'
       DISTRO_KEYRING: '{"alpine":"https://alpinelinux.org/keys/alpine-devel@lists.alpinelinux.org-4a6a0840.rsa.pub", "wolfi":"https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"}'
       PACKAGES_TO_BUILD: ${{ needs.detect-changes.outputs.force-rebuild == 'true' && needs.detect-changes.outputs.all-packages || needs.detect-changes.outputs.packages }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-22.04' }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0

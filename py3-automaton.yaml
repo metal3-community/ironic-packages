@@ -8,64 +8,30 @@ package:
   dependencies:
     provider-priority: 0
 
-vars:
-  pypi-package: automaton
-  import: automaton
-
-data:
-  - name: py-versions
-    items:
-      3.10: "310"
-      3.11: "311"
-      3.12: "312"
-      3.13: "313"
-
 environment:
   contents:
     packages:
-      - py3-supported-build-base
-      - py3-supported-pbr
+      - busybox
+      - py3-build
+      - py3-installer
+      - py3-pbr
+      - py3-prettytable
+      - python3
 
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/automaton
+      repository: https://github.com/openstack/automaton
       tag: ${{package.version}}
       expected-commit: 077b02126a78247d1b404e80aa166d69cecb0493
-  - uses: py/validate-pbr-version
+  - uses: python/build-wheel
+  - uses: strip
 
-subpackages:
-  - range: py-versions
-    name: py${{range.key}}-${{vars.pypi-package}}
-    description: python${{range.key}} version of ${{vars.pypi-package}}
-    dependencies:
-      provider-priority: ${{range.value}}
-      provides:
-        - py3-${{vars.pypi-package}}
-      runtime:
-        - py${{range.key}}-pbr=~6.1.0
-        - py${{range.key}}-prettytable=~3.11.0
-    pipeline:
-      - uses: py/build-wheel
-        with:
-          python: python${{range.key}}
-      - uses: strip
-    test:
-      pipeline:
-        - uses: python/import
-          with:
-            python: python${{range.key}}
-            imports: |
-              import ${{vars.import}}
-
-  - name: py3-supported-${{vars.pypi-package}}
-    description: meta package providing ${{vars.pypi-package}} for supported python versions.
-    dependencies:
-      runtime:
-        - py3.10-${{vars.pypi-package}}
-        - py3.11-${{vars.pypi-package}}
-        - py3.12-${{vars.pypi-package}}
-        - py3.13-${{vars.pypi-package}}
+var-transforms:
+  - from: ${{package.name}}
+    match: ^py3-(.+)$
+    replace: $1
+    to: import
 
 test:
   pipeline:

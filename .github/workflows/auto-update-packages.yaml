@@ -71,7 +71,7 @@ jobs:
           def get_openstack_releases():
               """Get OpenStack release information from governance repo"""
               try:
-                  url = "https://opendev.org/openstack/governance/raw/branch/master/reference/projects.yaml"
+                  url = "https://github.com/openstack/governance/raw/branch/master/reference/projects.yaml"
                   response = requests.get(url, timeout=30)
                   response.raise_for_status()
                   return yaml.safe_load(response.text)

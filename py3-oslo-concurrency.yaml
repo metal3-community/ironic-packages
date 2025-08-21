@@ -37,7 +37,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/oslo.concurrency
+      repository: https://github.com/openstack/oslo.concurrency
       tag: ${{package.version}}
       expected-commit: 4f60166c72931d436f7df54b23de75a3e67780a5
   - uses: py/validate-pbr-version
@@ -57,7 +57,7 @@ subpackages:
         - py${{range.key}}-oslo-utils=~7.3.0
         - py${{range.key}}-pbr=~6.1.0
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

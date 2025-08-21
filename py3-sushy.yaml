@@ -29,7 +29,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/sushy
+      repository: https://github.com/openstack/sushy
       tag: ${{package.version}}
       expected-commit: becb7ea8866ef5b012744a677af00e67d28b858d
   - uses: py/validate-pbr-version
@@ -48,7 +48,7 @@ subpackages:
         - py${{range.key}}-requests=~2.32.3
         - py${{range.key}}-stevedore=~5.3.0
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

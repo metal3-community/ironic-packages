@@ -29,7 +29,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/ironic
+      repository: https://github.com/openstack/ironic
       tag: ${{package.version}}
       expected-commit: 90346e5985e2020daf937597c0f875b21c153f78
   - uses: py/validate-pbr-version
@@ -87,7 +87,7 @@ subpackages:
         - py${{range.key}}-tooz=~6.3.0
         - py${{range.key}}-webob=~1.8.8
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

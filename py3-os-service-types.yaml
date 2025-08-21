@@ -29,7 +29,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/os-service-types
+      repository: https://github.com/openstack/os-service-types
       tag: ${{package.version}}
       expected-commit: 9216a0e9491c47df67c16f887bb8a8478b30dd68
   - uses: py/validate-pbr-version
@@ -45,7 +45,7 @@ subpackages:
       runtime:
         - py${{range.key}}-pbr=~6.1.0
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

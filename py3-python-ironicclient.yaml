@@ -34,7 +34,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/ironic-python-agent
+      repository: https://github.com/openstack/ironic-python-agent
       tag: ${{package.version}}
       expected-commit: 07f8c0767482df32bac9a00945ce56fbbf5e6729
   - uses: py/validate-pbr-version
@@ -65,7 +65,7 @@ subpackages:
         - py${{range.key}}-zeroconf=~0.24.0 # LGPL
         - py${{range.key}}-cheroot=~10.0.1 # BSD
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

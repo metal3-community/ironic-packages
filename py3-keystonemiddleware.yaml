@@ -29,7 +29,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/keystonemiddleware
+      repository: https://github.com/openstack/keystonemiddleware
       tag: ${{package.version}}
       expected-commit: 1ccae6430f14fedc6735bac5e33df557079fff41
   - uses: py/validate-pbr-version
@@ -59,7 +59,7 @@ subpackages:
         - py${{range.key}}-requests=~2.32.3
         - py${{range.key}}-webob=~1.8.8
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

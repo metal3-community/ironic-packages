@@ -29,7 +29,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/futurist
+      repository: https://github.com/openstack/futurist
       tag: ${{package.version}}
       expected-commit: 3b413c4172d34e6cdf7dc203a6e3b7ae117c47c4
   - uses: py/validate-pbr-version
@@ -43,7 +43,7 @@ subpackages:
       provides:
         - py3-${{vars.pypi-package}}
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

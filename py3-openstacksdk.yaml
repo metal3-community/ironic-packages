@@ -52,7 +52,7 @@ subpackages:
         - py${{range.key}}-pyyaml=~6.0.2
         - py${{range.key}}-requestsexceptions=~1.4.0
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

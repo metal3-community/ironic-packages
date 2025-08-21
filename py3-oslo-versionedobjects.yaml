@@ -35,7 +35,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/oslo.versionedobjects
+      repository: https://github.com/openstack/oslo.versionedobjects
       tag: ${{package.version}}
       expected-commit: 6cf2a605aee479f98fd292bec1ec2a6928c77b88
   - uses: py/validate-pbr-version
@@ -61,7 +61,7 @@ subpackages:
         - py${{range.key}}-oslo-utils=~7.3.0
         - py${{range.key}}-webob=~1.8.8
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

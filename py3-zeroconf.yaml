@@ -48,7 +48,7 @@ subpackages:
         - py${{range.key}}-async-timeout=~4.0.3
         - py${{range.key}}-ifaddr=~0.2.0
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

@@ -35,7 +35,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/oslo.upgradecheck
+      repository: https://github.com/openstack/oslo.upgradecheck
       tag: ${{package.version}}
       expected-commit: 93d3ba4f0beb8f0bb06604fa2020026b86f5772f
   - uses: py/validate-pbr-version
@@ -55,7 +55,7 @@ subpackages:
         - py${{range.key}}-oslo-utils=~7.3.0
         - py${{range.key}}-prettytable=~3.11.0
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

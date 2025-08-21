@@ -32,7 +32,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/os-traits
+      repository: https://github.com/openstack/os-traits
       tag: ${{package.version}}
       expected-commit: e1c432ab0bb68987a53cf9456d141260a8cd6b50
   - uses: py/validate-pbr-version
@@ -48,7 +48,7 @@ subpackages:
       runtime:
         - py${{range.key}}-pbr=~6.1.0
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip

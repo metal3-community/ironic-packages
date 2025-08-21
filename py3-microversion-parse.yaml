@@ -29,7 +29,7 @@ environment:
 pipeline:
   - uses: git-checkout
     with:
-      repository: https://opendev.org/openstack/microversion-parse
+      repository: https://github.com/openstack/microversion-parse
       tag: ${{package.version}}
       expected-commit: 12838702ef0c1cb9b3e2537e88296c31091c0228
   - uses: py/validate-pbr-version
@@ -45,7 +45,7 @@ subpackages:
       runtime:
         - py${{range.key}}-webob=~1.8.8
     pipeline:
-      - uses: py/build-wheel
+      - uses: python/build-wheel
         with:
           python: python${{range.key}}
       - uses: strip
