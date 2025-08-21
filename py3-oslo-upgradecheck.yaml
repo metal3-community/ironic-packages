@@ -1,7 +1,7 @@
 package:
   name: py3-oslo-upgradecheck
   description: Common code for writing OpenStack upgrade checks
-  version: 2.4.0
+  version: 2.5.0
   epoch: 1
   target-architecture:
     - all
@@ -29,7 +29,7 @@ pipeline:
     with:
       repository: https://github.com/openstack/oslo.upgradecheck
       tag: ${{package.version}}
-      expected-commit: 93d3ba4f0beb8f0bb06604fa2020026b86f5772f
+      expected-commit: 1687d9cc2253684b894425c96d988cc6f9fb77fe
   - uses: python/build-wheel
   - uses: strip
 
