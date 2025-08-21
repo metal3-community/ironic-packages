@@ -151,6 +151,13 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install APT dependencies
+        run: |
+          sudo apt update && \
+          sudo apt install -y \
+            bubblewrap \
+            qemu-user-static
+
       - id: setup-melange-cache
         uses: actions/cache/restore@v4
         with:
