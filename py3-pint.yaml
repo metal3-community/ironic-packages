@@ -6,7 +6,7 @@ package:
   target-architecture:
     - all
   copyright:
-    - license: BSD
+    - license: BSD-2-Clause
   dependencies:
     provider-priority: 0
 
