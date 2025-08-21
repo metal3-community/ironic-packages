@@ -34,6 +34,9 @@ permissions:
   pages: write
   id-token: write
 
+env:
+  SIGNING_KEY_PATH: ${{ github.workspace }}/melange.rsa
+
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
@@ -49,46 +52,24 @@ jobs:
       (github.event_name == 'push' ||
        github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'pull_request' && github.event.action != 'closed') ||
-       (github.event_name == 'pull_request' && github.event.action == 'closed' && 
+       (github.event_name == 'pull_request' && github.event.action == 'closed' &&
         github.event.pull_request.merged == true &&
-        (contains(github.event.pull_request.labels.*.name, 'package-update') || 
+        (contains(github.event.pull_request.labels.*.name, 'package-update') ||
          contains(github.event.pull_request.labels.*.name, 'dependencies') ||
          contains(github.event.pull_request.labels.*.name, 'automated'))))
     outputs:
-      packages: ${{ steps.changes.outputs.packages }}
-      all-packages: ${{ steps.all-packages.outputs.packages }}
-      force-rebuild: ${{ steps.check-force.outputs.force }}
+      packages: ${{ steps.check-force.outputs.force == 'true' && steps.all-packages.outputs.packages || steps.changes.outputs.packages }}
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
-        with:
-          egress-policy: audit
-
-      - name: Debug workflow trigger
-        run: |
-          echo "Event: ${{ github.event_name }}"
-          echo "Action: ${{ github.event.action }}"
-          echo "Repository: ${{ github.repository }}"
-          echo "Ref: ${{ github.ref }}"
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "PR Number: ${{ github.event.pull_request.number }}"
-            echo "PR Merged: ${{ github.event.pull_request.merged }}"
-            echo "PR Base Ref: ${{ github.event.pull_request.base.ref }}"
-            echo "PR Labels: ${{ toJson(github.event.pull_request.labels.*.name) }}"
-          fi
-
-      - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
 
       - name: Check force rebuild
         id: check-force
         run: |
-          if [[ "${{ github.event.inputs.force_rebuild }}" == "true" || 
-                "${{ github.event_name }}" == "push" ||
-                ("${{ github.event_name }}" == "pull_request" && 
-                 "${{ github.event.action }}" == "closed" && 
+          if [[ "${{ github.event.inputs.force_rebuild }}" == "true" || "${{ github.event_name }}" == "push" ||
+                ("${{ github.event_name }}" == "pull_request" &&
+                 "${{ github.event.action }}" == "closed" &&
                  "${{ github.event.pull_request.merged }}" == "true") ]]; then
             echo "force=true" >> $GITHUB_OUTPUT
             echo "Forcing rebuild due to: ${{ github.event_name }} / ${{ github.event.action }}"
@@ -115,22 +96,22 @@ jobs:
           else
             base_ref="HEAD~1"
           fi
-          
+
           if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.action }}" == "closed" ]]; then
             changed_files=$(git diff --name-only $base_ref $head_ref | grep -E '\.(yaml)$' || true)
           else
             changed_files=$(git diff --name-only $base_ref HEAD | grep -E '\.(yaml)$' || true)
           fi
-          
+
           packages=()
-          
+
           for file in $changed_files; do
             if [[ $file =~ ^py3-.*\.yaml$ ]]; then
               package="$file"
               packages+=("$package")
             fi
           done
-          
+
           if [[ ${#packages[@]} -eq 0 ]]; then
             echo "packages=[]" >> $GITHUB_OUTPUT
           else
@@ -147,11 +128,11 @@ jobs:
         arch: [amd64, arm64]
       fail-fast: false
     needs: detect-changes
-    if: github.repository == 'metal3-community/ironic-packages' && (needs.detect-changes.outputs.force-rebuild == 'true' || needs.detect-changes.outputs.packages != '[]')
+    if: github.repository == 'metal3-community/ironic-packages' && needs.detect-changes.outputs.packages != '[]'
     env:
       DISTRO_REPOSITORY: '{"alpine":"https://dl-cdn.alpinelinux.org/alpine/edge/main", "wolfi":"https://packages.wolfi.dev/os"}'
       DISTRO_KEYRING: '{"alpine":"https://alpinelinux.org/keys/alpine-devel@lists.alpinelinux.org-4a6a0840.rsa.pub", "wolfi":"https://packages.wolfi.dev/os/wolfi-signing.rsa.pub"}'
-      PACKAGES_TO_BUILD: ${{ needs.detect-changes.outputs.force-rebuild == 'true' && needs.detect-changes.outputs.all-packages || needs.detect-changes.outputs.packages }}
+      PACKAGES_TO_BUILD: ${{ needs.detect-changes.outputs.packages }}
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-22.04' }}
     steps:
       - name: Harden Runner
@@ -164,49 +145,72 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Cache permissions
-        run: |
-          sudo chown $(id -un) /var/cache/apt/archives
-
-      - name: Cache packages
+      - id: setup-melange-cache
         uses: actions/cache/restore@v4
         with:
-          path: /var/cache/apt/archives/*.deb
-          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /usr/local/bin/melange
+          key: melange-cache-${{ github.run_id }}-${{ github.run_attempt }}
 
-      - name: Build ${{ matrix.distro }} packages
-        uses: chainguard-dev/actions/melange-build@2cb024c203beac9650fa199c1618e5a729418c70 # v1.4.11
+      - name: Install melange
+        if: steps.setup-melange-cache.outputs.cache-hit != 'true'
+        run: |
+          # Install melange from the official releases
+          MELANGE_VERSION="0.30.6"
+
+          curl -sL "https://github.com/chainguard-dev/melange/releases/download/v${MELANGE_VERSION}/melange_${MELANGE_VERSION}_linux_${{ matrix.arch }}.tar.gz" \
+          | tar xvz --strip-components=1
+          sudo mv melange /usr/local/bin/
+          chmod +x /usr/local/bin/melange
+
+      - name: Download all package artifacts
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          pattern: packages
+          path: packages/${{ matrix.distro }}/${{ matrix.arch }}/
+        continue-on-error: true
+
+      - name: Ensure packages directory exists
+        run: |
+          mkdir -p packages/${{ matrix.distro }}/${{ matrix.arch }}
+
+      - uses: chainguard-dev/actions/melange-keygen@0cda751b114eb55c388e88f7479292668165602a # v1.0.2
+        with:
+          signing-key-path: ${{ env.SIGNING_KEY_PATH }}
+
+      - uses: chainguard-dev/actions/melange-build-pkg@2cb024c203beac9650fa199c1618e5a729418c70 # v1.4.11
         with:
           multi-config: ${{ join(fromJSON(env.PACKAGES_TO_BUILD), ',') }}
-          pipeline-dir: ./pipelines
-          archs: x86_64, arm64
-          sign-with-temporary-key: true
-          repository-append: ${{ fromJson(env.DISTRO_REPOSITORY)[matrix.distro] }}
-          keyring-append: ${{ fromJson(env.DISTRO_KEYRING)[matrix.distro] }}
+          # pipeline-dir: ./pipelines
+          archs: ${{ matrix.arch }}
+          signing-key-path: ${{ env.SIGNING_KEY_PATH }}
+          repository-path: ${{ github.workspace }}/packages/${{ matrix.distro }}/${{ matrix.arch }}
+          repository-append: |
+            ${{ fromJson(env.DISTRO_REPOSITORY)[matrix.distro] }}
+          keyring-append: |
+            ${{ fromJson(env.DISTRO_KEYRING)[matrix.distro] }}
           namespace: ${{ matrix.distro }}
 
       - name: Generate APK indexes for ${{ matrix.distro }}
         run: |
-          for arch in x86_64 arm64; do
-            packages_dir="packages/${{ matrix.distro }}/${arch}"
-            if [[ -d "$packages_dir" ]] && [[ $(ls -1 "$packages_dir"/*.apk 2>/dev/null | wc -l) -gt 0 ]]; then
-              echo "Generating APKINDEX for ${{ matrix.distro }}/${arch}"
-              cd "$packages_dir"
-              melange index \
-                --signing-key "../../../local-melange.rsa" \
-                --output APKINDEX.tar.gz \
-                *.apk || true
-              cd - > /dev/null
-            else
-              echo "No packages found for ${{ matrix.distro }}/${arch}, skipping index generation"
-            fi
-          done
+          packages_dir="packages/${{ matrix.distro }}/${{ matrix.arch }}"
+          if [[ -d "$packages_dir" ]] && [[ $(ls -1 "${packages_dir}"/*.apk 2>/dev/null | wc -l) -gt 0 ]]; then
+            echo "Generating APKINDEX for ${{ matrix.distro }}/${{ matrix.arch }}"
+            signing_key="$(readlink -f local-melange.rsa)"
+            cd "$packages_dir"
+            melange index \
+              --signing-key "${signing_key}" \
+              --merge APKINDEX.tar.gz \
+              *.apk || true
+            cd - > /dev/null
+          else
+            echo "No packages found for ${{ matrix.distro }}/${{ matrix.arch }}, skipping index generation"
+          fi
 
       - name: Upload packages artifacts for ${{ matrix.distro }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: packages-${{ matrix.distro }}
-          path: packages/${{ matrix.distro }}/
+          name: packages
+          path: packages/${{ matrix.distro }}/${{ matrix.arch }}/
           retention-days: 30
 
   publish-repository:
@@ -214,13 +218,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: [detect-changes, build-packages]
     if: |
-      github.repository == 'metal3-community/ironic-packages' && 
-      (github.ref == 'refs/heads/main' || 
-       (github.event_name == 'pull_request' && 
-        github.event.action == 'closed' && 
+      github.repository == 'metal3-community/ironic-packages' &&
+      (github.ref == 'refs/heads/main' ||
+       (github.event_name == 'pull_request' &&
+        github.event.action == 'closed' &&
         github.event.pull_request.merged == true &&
         github.event.pull_request.base.ref == 'main')) &&
-      (needs.detect-changes.outputs.force-rebuild == 'true' || needs.detect-changes.outputs.packages != '[]')
+      (needs.detect-changes.outputs.packages != '[]')
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
@@ -233,9 +237,8 @@ jobs:
       - name: Download all package artifacts
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
-          pattern: packages-*
-          path: artifacts/
-          merge-multiple: true
+          pattern: packages
+          path: packages/
 
       - name: Setup Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
@@ -243,13 +246,13 @@ jobs:
       - name: Organize repository structure
         run: |
           mkdir -p repository
-          
-          # The artifacts already contain the proper distro/arch structure
+
+          # The packages already contain the proper distro/arch structure
           # Just copy everything to the repository directory
-          if [[ -d "artifacts" ]]; then
-            cp -r artifacts/* repository/ || true
+          if [[ -d "packages" ]]; then
+            cp -r packages/* repository/ || true
           fi
-          
+
           # Ensure the directory structure exists even if some combinations are empty
           for distro in alpine wolfi; do
             for arch in x86_64 arm64; do
@@ -282,53 +285,53 @@ jobs:
               <div class="container">
                   <h1>Metal3 Ironic APK Repository</h1>
                   <p>This repository contains APK packages for OpenStack Ironic and its dependencies, built for both Alpine Linux and Wolfi.</p>
-                  
+
                   <div class="warning">
                       <strong>⚠️ Note:</strong> This is an unofficial repository. Use at your own discretion.
                   </div>
-                  
+
                   <h2>Available Distributions</h2>
           EOF
-          
+
           for distro in alpine wolfi; do
             echo "        <div class='distro'>" >> repository/index.html
             echo "          <h3>$(echo $distro | tr '[:lower:]' '[:upper:]')</h3>" >> repository/index.html
             echo "          <div class='arch-list'>" >> repository/index.html
-            
+
             for arch in x86_64 arm64; do
               if [[ -d "repository/${distro}/${arch}" ]] && [[ $(ls -1 repository/${distro}/${arch}/*.apk 2>/dev/null | wc -l) -gt 0 ]]; then
                 echo "            <p><a href='./${distro}/${arch}/'>${arch}</a> - $(ls -1 repository/${distro}/${arch}/*.apk 2>/dev/null | wc -l) packages</p>" >> repository/index.html
               fi
             done
-            
+
             echo "          </div>" >> repository/index.html
             echo "        </div>" >> repository/index.html
           done
-          
+
           cat >> repository/index.html << 'EOF'
-                  
+
                   <h2>Repository URLs</h2>
                   <p>To use this repository, add the following URLs to your APK configuration:</p>
-                  
+
                   <div class="repo-url">
                   Alpine: https://metal3-community.github.io/ironic-packages/alpine<br>
                   Wolfi: https://metal3-community.github.io/ironic-packages/wolfi<br>
                   </div>
-                  
+
                   <h2>Usage</h2>
                   <p>Add the repository to your APK configuration:</p>
                   <div class="repo-url">
                   echo "https://metal3-community.github.io/ironic-packages/alpine" >> /etc/apk/repositories<br>
                   apk update
                   </div>
-                  
+
                   <p>Last updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')</p>
                   <p>Source: <a href="https://github.com/metal3-community/ironic-packages">github.com/metal3-community/ironic-packages</a></p>
               </div>
           </body>
           </html>
           EOF
-          
+
           # Create directory index files for each distribution/architecture
           for distro in alpine wolfi; do
             for arch in x86_64 arm64; do
@@ -356,9 +359,9 @@ jobs:
                   <div class="back-link">
                       <a href="../../">← Back to main repository</a>
                   </div>
-                  
+
                   <h1>${distro^} ${arch} Packages</h1>
-                  
+
                   <table>
                       <thead>
                           <tr>
@@ -369,14 +372,14 @@ jobs:
                       </thead>
                       <tbody>
           EOF
-                
+
                 if [[ -f "repository/${distro}/${arch}/APKINDEX.tar.gz" ]]; then
                   file="APKINDEX.tar.gz"
                   size=$(stat -f%z "repository/${distro}/${arch}/${file}" 2>/dev/null || stat -c%s "repository/${distro}/${arch}/${file}" 2>/dev/null || echo "0")
                   mod_time=$(stat -f%Sm "repository/${distro}/${arch}/${file}" 2>/dev/null || stat -c%y "repository/${distro}/${arch}/${file}" 2>/dev/null || echo "unknown")
                   echo "                          <tr><td><a href='./${file}'>${file}</a></td><td>${size} bytes</td><td>${mod_time}</td></tr>" >> "repository/${distro}/${arch}/index.html"
                 fi
-                
+
                 for file in repository/${distro}/${arch}/*.apk; do
                   if [[ -f "$file" ]]; then
                     filename=$(basename "$file")
@@ -385,11 +388,11 @@ jobs:
                     echo "                          <tr><td><a href='./${filename}'>${filename}</a></td><td>${size} bytes</td><td>${mod_time}</td></tr>" >> "repository/${distro}/${arch}/index.html"
                   fi
                 done
-                
+
                 cat >> "repository/${distro}/${arch}/index.html" << 'EOF'
                       </tbody>
                   </table>
-                  
+
                   <p>Last updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')</p>
               </div>
           </body>
