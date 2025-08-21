@@ -27,7 +27,7 @@ pipeline:
     with:
       repository: https://github.com/openstack/openstacksdk
       tag: ${{package.version}}
-      expected-commit: bd32ccd44e81174d2e3887c289e6089b77896215
+      expected-commit: f1e2760a6f040e710d77a7ed30250c3de2e28dde
   - uses: py/validate-pbr-version
 subpackages:
   - range: py-versions
