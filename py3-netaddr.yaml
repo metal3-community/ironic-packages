@@ -28,8 +28,8 @@ pipeline:
 
 var-transforms:
   - from: ${{package.name}}
-    match: ^py3-(.+)$
-    replace: $1
+    match: ^py3-
+    replace: ""
     to: import
 
 test:

@@ -16,7 +16,6 @@ package:
       - py3-iso8601
       - py3-jmespath
       - py3-jsonpatch
-      - py3-keystoneauth1
       - py3-netifaces
       - py3-os-service-types
       - py3-platformdirs

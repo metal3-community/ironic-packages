@@ -20,8 +20,6 @@ package:
       - py3-jinja2
       - py3-jsonpatch
       - py3-jsonschema
-      - py3-keystoneauth1
-      - py3-keystonemiddleware
       - py3-microversion-parse
       - py3-netaddr
       - py3-openstacksdk

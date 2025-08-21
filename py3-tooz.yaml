@@ -23,15 +23,7 @@ environment:
       - busybox
       - py3-build
       - py3-installer
-      - py3-fasteners
-      - py3-futurist
-      - py3-msgpack
-      - py3-oslo-serialization
-      - py3-oslo-utils
       - py3-pbr
-      - py3-stevedore
-      - py3-tenacity
-      - py3-voluptuous
       - python3
 
 pipeline:

@@ -23,15 +23,6 @@ environment:
       - busybox
       - py3-build
       - py3-installer
-      - py3-netaddr
-      - py3-oslo-concurrency
-      - py3-oslo-config
-      - py3-oslo-serialization
-      - py3-oslo-utils
-      - py3-pbr
-      - py3-prettytable
-      - py3-requests
-      - py3-webob
       - python3
 
 pipeline:
