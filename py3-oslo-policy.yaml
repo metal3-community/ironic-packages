@@ -1,7 +1,7 @@
 package:
   name: py3-oslo-policy
   description: Oslo Policy library
-  version: 4.4.0
+  version: 4.5.1
   epoch: 1
   target-architecture:
     - all
@@ -32,7 +32,7 @@ pipeline:
     with:
       repository: https://github.com/openstack/oslo.policy
       tag: ${{package.version}}
-      expected-commit: 20e78309fbc897d5a65c8dd51b7195fd4290c8b4
+      expected-commit: 6aaa02b930be51e3afc9e524776bffe800a32745
   - uses: python/build-wheel
   - uses: strip
 
