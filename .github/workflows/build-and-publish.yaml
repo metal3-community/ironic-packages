@@ -162,6 +162,16 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Cache permissions
+        run: |
+          sudo chown $(id -un) /var/cache/apt/archives
+
+      - name: Cache packages
+        uses: actions/cache/restore@v4
+        with:
+          path: /var/cache/apt/archives/*.deb
+          key: apt-cache-${{ github.run_id }}-${{ github.run_attempt }}
+      
       - name: Setup Melange
         uses: chainguard-dev/actions/setup-melange@2cb024c203beac9650fa199c1618e5a729418c70 # v1.4.11
         with:
