@@ -1,13 +1,12 @@
 package:
   name: py3-futurist
   description: Useful additions to futures, from the future.
-  version: 3.0.0
+  version: "3.2.0"
   epoch: 1
   copyright:
     - license: Apache-2.0
   dependencies:
     provider-priority: 0
-
 environment:
   contents:
     packages:
@@ -16,22 +15,19 @@ environment:
       - py3-installer
       - py3-pbr
       - python3
-
 pipeline:
   - uses: git-checkout
     with:
       repository: https://github.com/openstack/futurist
       tag: ${{package.version}}
-      expected-commit: 3b413c4172d34e6cdf7dc203a6e3b7ae117c47c4
+      expected-commit: 9ea9a0080f07bcb856c0ed923a509f649833ca49
   - uses: python/build-wheel
   - uses: strip
-
 var-transforms:
   - from: ${{package.name}}
     match: ^py3-(.+)$
     replace: $1
     to: import
-
 test:
   pipeline:
     - uses: python/import

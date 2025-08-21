@@ -8,38 +8,24 @@ package:
   copyright:
     - license: Apache-2.0
   dependencies:
+    provider-priority: 0
     runtime:
       - py3-oslo-config
       - py3-oslo-context
-      - py3-oslo-i18n
       - py3-oslo-serialization
       - py3-oslo-utils
       - py3-yaml
       - py3-requests
       - py3-stevedore
 
-var-transforms:
-  - from: ${{package.name}}
-    match: ^py3-
-    replace: ""
-    to: pypi-package
-  - from: ${{vars.pypi-package}}
-    match: "-"
-    replace: "_"
-    to: import-name
-
 environment:
   contents:
     packages:
       - busybox
-      - ca-certificates-bundle
-      - py3-gpep517
-      - py3-pip
+      - py3-build
+      - py3-installer
       - py3-setuptools
-      - py3-wheel
       - python3
-      - python3-dev
-      - py3-pbr
 
 pipeline:
   - uses: git-checkout
@@ -48,8 +34,17 @@ pipeline:
       tag: ${{package.version}}
       expected-commit: 20e78309fbc897d5a65c8dd51b7195fd4290c8b4
   - uses: python/build-wheel
-  - uses: python/import
-    with:
-      imports: |
-        import ${{vars.import-name}}
   - uses: strip
+
+var-transforms:
+  - from: ${{package.name}}
+    match: ^py3-(.+)$
+    replace: $1
+    to: import
+
+test:
+  pipeline:
+    - uses: python/import
+      with:
+        imports: |
+          import ${{vars.import}}
