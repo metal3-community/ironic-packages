@@ -7,27 +7,23 @@ package:
     - license: LGPL-2.0
   dependencies:
     provider-priority: 0
-
-vars:
-  pypi-package: zeroconf
-  import: zeroconf
-
-data:
-  - name: py-versions
-    items:
-      3.10: "310"
-      3.11: "311"
-      3.12: "312"
-      3.13: "313"
+    runtime:
+      - py3-async-timeout
+      - py3-ifaddr
 
 environment:
   contents:
     packages:
-      - py3-supported-build-base
-      - py3-supported-cython
-      - py3-supported-poetry-core
-      - py3-supported-setuptools
-      - py3-supported-wheel
+      - busybox
+      - py3-async-timeout
+      - py3-build
+      - py3-cython
+      - py3-ifaddr
+      - py3-installer
+      - py3-poetry-core
+      - py3-setuptools
+      - py3-wheel
+      - python3
 
 pipeline:
   - uses: git-checkout
@@ -35,39 +31,14 @@ pipeline:
       repository: https://github.com/python-zeroconf/python-zeroconf
       tag: ${{package.version}}
       expected-commit: 8dd1f99c9aeb195a74ed6b9c56b1afa891a8c28c
+  - uses: python/build-wheel
+  - uses: strip
 
-subpackages:
-  - range: py-versions
-    name: py${{range.key}}-${{vars.pypi-package}}
-    description: python${{range.key}} version of ${{vars.pypi-package}}
-    dependencies:
-      provider-priority: ${{range.value}}
-      provides:
-        - py3-${{vars.pypi-package}}
-      runtime:
-        - py${{range.key}}-async-timeout=~4.0.3
-        - py${{range.key}}-ifaddr=~0.2.0
-    pipeline:
-      - uses: python/build-wheel
-        with:
-          python: python${{range.key}}
-      - uses: strip
-    test:
-      pipeline:
-        - uses: python/import
-          with:
-            python: python${{range.key}}
-            imports: |
-              import ${{vars.import}}
-
-  - name: py3-supported-${{vars.pypi-package}}
-    description: meta package providing ${{vars.pypi-package}} for supported python versions.
-    dependencies:
-      runtime:
-        - py3.10-${{vars.pypi-package}}
-        - py3.11-${{vars.pypi-package}}
-        - py3.12-${{vars.pypi-package}}
-        - py3.13-${{vars.pypi-package}}
+var-transforms:
+  - from: ${{package.name}}
+    match: ^py3-(.+)$
+    replace: $1
+    to: import
 
 test:
   pipeline:

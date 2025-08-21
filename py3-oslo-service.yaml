@@ -3,34 +3,48 @@ package:
   description: oslo.service library
   version: 3.5.0
   epoch: 1
+  target-architecture:
+    - all
   copyright:
     - license: Apache-2.0
   dependencies:
-    provider-priority: 0
-
-vars:
-  pypi-package: oslo.service
-  import: oslo_service
+    runtime:
+      - py3-debtcollector
+      - py3-eventlet
+      - py3-greenlet
+      - py3-oslo-concurrency
+      - py3-oslo-config
+      - py3-oslo-i18n
+      - py3-oslo-log
+      - py3-oslo-utils
+      - py3-paste
+      - py3-pastedeploy
+      - py3-routes
+      - py3-webob
+      - py3-yappi
 
 var-transforms:
+  - from: ${{package.name}}
+    match: ^py3-
+    replace: ""
+    to: pypi-package
   - from: ${{vars.pypi-package}}
-    match: '\.'
-    replace: "-"
-    to: mangled-package-name
-
-data:
-  - name: py-versions
-    items:
-      3.10: "310"
-      3.11: "311"
-      3.12: "312"
-      3.13: "313"
+    match: "-"
+    replace: "_"
+    to: import-name
 
 environment:
   contents:
     packages:
-      - py3-supported-build-base
-      - py3-supported-pbr
+      - busybox
+      - ca-certificates-bundle
+      - py3-gpep517
+      - py3-pip
+      - py3-setuptools
+      - py3-wheel
+      - python3
+      - python3-dev
+      - py3-pbr
 
 pipeline:
   - uses: git-checkout
@@ -38,52 +52,9 @@ pipeline:
       repository: https://github.com/openstack/oslo.service
       tag: ${{package.version}}
       expected-commit: 979ada7f673d49e0b42c70829d19187eeee379d7
-  - uses: py/validate-pbr-version
-
-subpackages:
-  - range: py-versions
-    name: py${{range.key}}-${{vars.mangled-package-name}}
-    description: python${{range.key}} version of ${{vars.pypi-package}}
-    dependencies:
-      provider-priority: ${{range.value}}
-      provides:
-        - py3-${{vars.mangled-package-name}}
-      runtime:
-        - py${{range.key}}-debtcollector=~3.0.0
-        - py${{range.key}}-eventlet=~0.36.1
-        - py${{range.key}}-greenlet=~3.0.3
-        - py${{range.key}}-oslo-concurrency=~6.1.0
-        - py${{range.key}}-oslo-config=~9.6.0
-        - py${{range.key}}-oslo-i18n=~6.4.0
-        - py${{range.key}}-oslo-log=~6.1.2
-        - py${{range.key}}-oslo-utils=~7.3.0
-        - py${{range.key}}-paste=~3.10.1
-        - py${{range.key}}-pastedeploy=~3.1.0
-        - py${{range.key}}-routes=~2.5.1
-        - py${{range.key}}-webob=~1.8.8
-        - py${{range.key}}-yappi=~1.6.0
-    pipeline:
-      - uses: python/build-wheel
-        with:
-          python: python${{range.key}}
-      - uses: strip
-    test:
-      pipeline:
-        - uses: python/import
-          with:
-            python: python${{range.key}}
-            imports: |
-              import ${{vars.import}}
-
-  - name: py3-supported-${{vars.mangled-package-name}}
-    description: meta package providing ${{vars.pypi-package}} for supported python versions.
-    dependencies:
-      runtime:
-        - py3.10-${{vars.mangled-package-name}}
-
-test:
-  pipeline:
-    - uses: python/import
-      with:
-        imports: |
-          import ${{vars.import}}
+  - uses: python/build-wheel
+  - uses: python/import
+    with:
+      imports: |
+        import ${{vars.import-name}}
+  - uses: strip

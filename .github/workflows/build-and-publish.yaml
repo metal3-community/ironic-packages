@@ -198,7 +198,7 @@ jobs:
           # pipeline-dir: ./pipelines
           archs: ${{ matrix.arch }}
           signing-key-path: ${{ env.SIGNING_KEY_PATH }}
-          repository-path: ${{ github.workspace }}/packages/${{ matrix.distro.name }}/${{ matrix.arch }}
+          repository-path: ${{ github.workspace }}/packages/${{ matrix.distro.name }}
           repository-append: |
             ${{ matrix.distro.repository }}
           keyring-append: ${{ matrix.distro.keyring }}

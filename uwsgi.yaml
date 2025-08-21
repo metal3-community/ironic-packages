@@ -3,18 +3,10 @@ package:
   description: uWSGI application server container
   version: 2.0.28
   epoch: 0
+  target-architecture:
+    - all
   copyright:
     - license: GPL-2.0-only
-
-vars:
-  package: uwsgi
-  pypi-package: zun
-  import: zun
-
-data:
-  - name: py-versions
-    items:
-      3.10: "310"
 
 environment:
   contents:
@@ -26,8 +18,7 @@ environment:
       - libxml2-dev
       - openssl-dev
       - pcre2-dev
-      - py3-supported-build-base
-      - py3-supported-python-dev
+      - python3-dev
       - yaml-dev
 
 pipeline:
@@ -43,27 +34,23 @@ pipeline:
       EOF
 
 subpackages:
-  - name: ${{vars.package}}-core
-    description: core package for ${{vars.package}}
+  - name: uwsgi-core
+    description: core package for uwsgi
     pipeline:
-      - runs: python3.10 uwsgiconfig.py --build wolfi
+      - runs: python3 uwsgiconfig.py --build wolfi
       - runs: |
           mkdir -p ${{targets.subpkgdir}}/usr/bin
           mv uwsgi ${{targets.subpkgdir}}/usr/bin/uwsgi
       - uses: strip
 
-  - range: py-versions
-    name: uwsgi-plugin-python${{range.key}}
-    description: python${{range.key}} plugin of uwsgi
+  - name: uwsgi-plugin-python3
+    description: python3 plugin of uwsgi
     dependencies:
-      provider-priority: ${{range.value}}
-      provides:
-        - uwsgi-plugin-python3
       runtime:
         - uwsgi-core
     pipeline:
-      - runs: python${{range.key}} uwsgiconfig.py --plugin plugins/python wolfi python${{range.value}}
+      - runs: python3 uwsgiconfig.py --plugin plugins/python wolfi python3
       - runs: |
           mkdir -p ${{targets.subpkgdir}}/usr/lib/uwsgi
-          mv python${{range.value}}_plugin.so ${{targets.subpkgdir}}/usr/lib/uwsgi/python${{range.value}}_plugin.so
+          mv python3_plugin.so ${{targets.subpkgdir}}/usr/lib/uwsgi/python3_plugin.so
       - uses: strip
