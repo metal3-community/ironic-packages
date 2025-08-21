@@ -131,7 +131,8 @@ jobs:
               https://dl-cdn.alpinelinux.org/alpine/edge/community
             keyring: ''
           - name: wolfi
-            repository: https://packages.wolfi.dev/os
+            repository: |
+              https://packages.wolfi.dev/os
             keyring: https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
         arch: [amd64, arm64]
       fail-fast: false
@@ -198,7 +199,8 @@ jobs:
           archs: ${{ matrix.arch }}
           signing-key-path: ${{ env.SIGNING_KEY_PATH }}
           repository-path: ${{ github.workspace }}/packages/${{ matrix.distro.name }}/${{ matrix.arch }}
-          repository-append: ${{ matrix.distro.repository }}
+          repository-append: |
+            ${{ matrix.distro.repository }}
           keyring-append: ${{ matrix.distro.keyring }}
 
       - name: Generate APK indexes for ${{ matrix.distro.name }}
