@@ -169,11 +169,13 @@ jobs:
 
       - name: Install melange
         if: steps.setup-melange-cache.outputs.cache-hit != 'true'
+        env:
+          ARCH: ${{ matrix.arch == 'aarch64' && "arm64" || "amd64" }}
         run: |
           # Install melange from the official releases
           MELANGE_VERSION="0.30.6"
 
-          curl -sL "https://github.com/chainguard-dev/melange/releases/download/v${MELANGE_VERSION}/melange_${MELANGE_VERSION}_linux_${{ matrix.arch }}.tar.gz" \
+          curl -sL "https://github.com/chainguard-dev/melange/releases/download/v${MELANGE_VERSION}/melange_${MELANGE_VERSION}_linux_${ARCH}.tar.gz" \
           | tar xvz --strip-components=1
           sudo mv melange /usr/local/bin/
           chmod +x /usr/local/bin/melange
