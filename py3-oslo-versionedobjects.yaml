@@ -1,7 +1,7 @@
 package:
   name: py3-oslo-versionedobjects
   description: Oslo Versioned Objects library
-  version: 3.4.0
+  version: 3.7.0
   epoch: 1
   target-architecture:
     - all
@@ -35,7 +35,7 @@ pipeline:
     with:
       repository: https://github.com/openstack/oslo.versionedobjects
       tag: ${{package.version}}
-      expected-commit: 6cf2a605aee479f98fd292bec1ec2a6928c77b88
+      expected-commit: 9954d12a03744f5a9e4214515f0da7296db3619f
   - uses: python/build-wheel
   - uses: strip
 
