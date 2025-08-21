@@ -170,7 +170,7 @@ jobs:
       - name: Install melange
         if: steps.setup-melange-cache.outputs.cache-hit != 'true'
         env:
-          ARCH: ${{ matrix.arch == 'aarch64' && "arm64" || "amd64" }}
+          ARCH: ${{ matrix.arch == 'aarch64' && 'arm64' || 'amd64' }}
         run: |
           # Install melange from the official releases
           MELANGE_VERSION="0.30.6"
