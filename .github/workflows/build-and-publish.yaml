@@ -136,14 +136,12 @@ jobs:
             repository: |
               https://packages.wolfi.dev/os
             keyring: https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
-        arch: [amd64, arm64]
+        arch: [x86_64, aarch64]
       fail-fast: false
     needs: detect-changes
     if: github.repository == 'metal3-community/ironic-packages' && needs.detect-changes.outputs.packages != '[]'
     env:
       PACKAGES_TO_BUILD: ${{ needs.detect-changes.outputs.packages }}
-      # Map GitHub runner arch to APK arch
-      APK_ARCH: ${{ matrix.arch == 'amd64' && 'x86_64' || 'aarch64' }}
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-22.04' }}
     steps:
       - name: Harden Runner
@@ -184,12 +182,12 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           pattern: packages
-          path: packages/${{ matrix.distro.name }}/${{ env.APK_ARCH }}/
+          path: packages/${{ matrix.distro.name }}/${{ matrix.arch }}/
         continue-on-error: true
 
       - name: Ensure packages directory exists
         run: |
-          mkdir -p packages/${{ matrix.distro.name }}/${{ env.APK_ARCH }}
+          mkdir -p packages/${{ matrix.distro.name }}/${{ matrix.arch }}
 
       - uses: chainguard-dev/actions/melange-keygen@0cda751b114eb55c388e88f7479292668165602a # v1.0.2
         with:
@@ -201,7 +199,7 @@ jobs:
         with:
           namespace: ${{ matrix.distro.name }}
           multi-config: ${{ join(fromJSON(env.PACKAGES_TO_BUILD), ',') }}
-          archs: ${{ env.APK_ARCH }}
+          archs: ${{ matrix.arch }}
           signing-key-path: ${{ env.SIGNING_KEY_PATH }}
           repository-path: ${{ github.workspace }}/packages/${{ matrix.distro.name }}
           repository-append: |
@@ -211,9 +209,9 @@ jobs:
 
       - name: Generate APK indexes for ${{ matrix.distro.name }}
         run: |
-          packages_dir="packages/${{ matrix.distro.name }}/${{ env.APK_ARCH }}"
+          packages_dir="packages/${{ matrix.distro.name }}/${{ matrix.arch }}"
           if [[ -d "$packages_dir" ]] && [[ $(ls -1 "${packages_dir}"/*.apk 2>/dev/null | wc -l) -gt 0 ]]; then
-            echo "Generating APKINDEX for ${{ matrix.distro.name }}/${{ env.APK_ARCH }}"
+            echo "Generating APKINDEX for ${{ matrix.distro.name }}/${{ matrix.arch }}"
             signing_key="$(readlink -f ${{ env.SIGNING_KEY_PATH }})"
             cd "$packages_dir"
 
@@ -226,14 +224,14 @@ jobs:
               *.apk || echo "Warning: Failed to generate APKINDEX, continuing..."
             cd - > /dev/null
           else
-            echo "No packages found for ${{ matrix.distro.name }}/${{ env.APK_ARCH }}, skipping index generation"
+            echo "No packages found for ${{ matrix.distro.name }}/${{ matrix.arch }}, skipping index generation"
           fi
 
       - name: Upload packages artifacts for ${{ matrix.distro.name }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: packages
-          path: packages/${{ matrix.distro.name }}/${{ env.APK_ARCH }}/
+          path: packages/${{ matrix.distro.name }}/${{ matrix.arch }}/
           retention-days: 30
 
   publish-repository:
