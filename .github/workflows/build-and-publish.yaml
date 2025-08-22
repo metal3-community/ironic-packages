@@ -191,11 +191,11 @@ jobs:
         run: |
           mkdir -p packages/${{ matrix.distro.name }}/${{ matrix.arch }}
 
-      - uses: chainguard-dev/actions/melange-keygen@0cda751b114eb55c388e88f7479292668165602a # v1.0.2
+      - uses: chainguard-dev/actions/melange-keygen@de82dfd62f186b1b55bd0cdf084f484496d88ee3 # v1.4.11
         with:
           signing-key-path: ${{ env.SIGNING_KEY_PATH }}
 
-      - uses: chainguard-dev/actions/melange-build-pkg@2cb024c203beac9650fa199c1618e5a729418c70 # v1.4.11
+      - uses: chainguard-dev/actions/melange-build-pkg@de82dfd62f186b1b55bd0cdf084f484496d88ee3 # v1.4.11
         env:
           MELANGE_RUNNER: docker  # Use docker runner to avoid bubblewrap issues
         with:
