@@ -125,7 +125,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /usr/local/bin/melange
-          key: melange-cache-amd64
+          key: melange-cache-x86_64
 
       - name: Install melange
         if: steps.setup-melange-cache.outputs.cache-hit != 'true'
