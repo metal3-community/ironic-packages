@@ -1,7 +1,7 @@
 package:
   name: py3-oslo-middleware
   description: Oslo Middleware library
-  version: 6.2.0
+  version: 6.6.0
   epoch: 1
   copyright:
     - license: Apache-2.0
@@ -31,7 +31,7 @@ pipeline:
     with:
       repository: https://github.com/openstack/oslo.middleware
       tag: ${{package.version}}
-      expected-commit: a3315d7b9d92e71ea76433d85c6e1cdd3e48f02f
+      expected-commit: 268e555c12315a27a7fe7ab00cf91f68b277460b
   - uses: python/build-wheel
   - uses: strip
 
