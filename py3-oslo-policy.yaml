@@ -1,7 +1,7 @@
 package:
   name: py3-oslo-policy
   description: Oslo Policy library
-  version: 4.4.0
+  version: 4.6.0
   epoch: 1
   copyright:
     - license: Apache-2.0
@@ -30,7 +30,7 @@ pipeline:
     with:
       repository: https://github.com/openstack/oslo.policy
       tag: ${{package.version}}
-      expected-commit: 20e78309fbc897d5a65c8dd51b7195fd4290c8b4
+      expected-commit: 4dccbc7085b8acd05e3f262dde459c7b00e9d8b9
   - uses: python/build-wheel
   - uses: strip
 
