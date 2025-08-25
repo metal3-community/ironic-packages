@@ -1,7 +1,7 @@
 package:
   name: py3-oslo-serialization
   description: Oslo Serialization library
-  version: 5.5.0
+  version: 5.8.0
   epoch: 1
   copyright:
     - license: Apache-2.0
@@ -26,7 +26,7 @@ pipeline:
     with:
       repository: https://github.com/openstack/oslo.serialization
       tag: ${{package.version}}
-      expected-commit: d99ef9f6dfb0fa3747d682117caac02bb80c75cf
+      expected-commit: 71bdd093284b4563b7973bb092bc656abf654505
   - uses: python/build-wheel
   - uses: strip
 
