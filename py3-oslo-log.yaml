@@ -1,7 +1,7 @@
 package:
   name: py3-oslo-log
   description: oslo.log library
-  version: 6.1.2
+  version: 7.2.1
   epoch: 1
   copyright:
     - license: Apache-2.0
@@ -28,7 +28,7 @@ pipeline:
     with:
       repository: https://github.com/openstack/oslo.log
       tag: ${{package.version}}
-      expected-commit: dc9be22bafdc8e7c324c41f4912e0ffe569ecca2
+      expected-commit: 83d759c2e0ba03d3f3fd41b9442e27567b007da1
   - uses: python/build-wheel
   - uses: strip
 
