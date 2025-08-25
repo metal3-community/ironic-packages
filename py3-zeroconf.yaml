@@ -1,7 +1,7 @@
 package:
   name: py3-zeroconf
   description: A pure python implementation of multicast DNS service discovery
-  version: 0.132.2
+  version: 0.147.0
   epoch: 1
   copyright:
     - license: LGPL-2.0
@@ -30,7 +30,7 @@ pipeline:
     with:
       repository: https://github.com/python-zeroconf/python-zeroconf
       tag: ${{package.version}}
-      expected-commit: 8dd1f99c9aeb195a74ed6b9c56b1afa891a8c28c
+      expected-commit: 7d517af649342bf14011fcf4e12439575e6b9718
   - uses: python/build-wheel
   - uses: strip
 
