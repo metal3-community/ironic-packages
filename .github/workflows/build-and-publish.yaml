@@ -189,26 +189,41 @@ jobs:
 
       - name: Ensure packages directory exists
         run: |
+          mkdir -p workspace
+          mkdir -p cache
           mkdir -p packages/${{ matrix.distro.name }}/${{ matrix.arch }}
 
       - uses: chainguard-dev/actions/melange-keygen@0cda751b114eb55c388e88f7479292668165602a # v1.0.2
         with:
           signing-key-path: ${{ env.SIGNING_KEY_PATH }}
 
-      - uses: chainguard-dev/actions/melange-build-pkg@2cb024c203beac9650fa199c1618e5a729418c70 # v1.4.11
+      - name: Melange Build
         env:
           MELANGE_RUNNER: docker  # Use docker runner to avoid bubblewrap issues
-        with:
-          namespace: ${{ matrix.distro.name }}
-          multi-config: ${{ join(fromJSON(env.PACKAGES_TO_BUILD), ',') }}
-          archs: ${{ matrix.arch }}
-          sign-with-key: true
-          signing-key-path: ${{ env.SIGNING_KEY_PATH }}
-          repository-path: ${{ github.workspace }}/packages/${{ matrix.distro.name }}
-          repository-append: |
-            ${{ matrix.distro.repository }}
-          keyring-append: |
-            ${{ matrix.distro.keyring }}
+          KEYRING: ${{ matrix.distro.keyring }}
+          REPOSITORY: ${{ matrix.distro.repository }}
+          CONFIGS: ${{ join(fromJSON(env.PACKAGES_TO_BUILD), ',') }}
+        run: |
+          repository_args="--repository-append ./packages/${{ matrix.distro.name }}"
+          for repo in ${REPOSITORY}; do
+            repository_args+=" --repository-append $repo"
+          done
+          keyring_args="--keyring-append ${{ env.SIGNING_KEY_PATH }}.pub"
+          for key in ${KEYRING}; do
+            keyring_args+=" --keyring-append $key"
+          done
+          for config in ${CONFIGS//,/ }; do
+            melange build --arch ${{ matrix.arch }} \
+              --namespace ${{ matrix.distro.name }} \
+              --workspace-dir ./workspace \
+              --cache-dir ./cache \
+              --out-dir ./packages/${{ matrix.distro.name }} \
+              --log-level info \
+              --signing-key ${{ env.SIGNING_KEY_PATH }} \
+              ${repository_args} \
+              ${keyring_args} \
+              ${{ github.workspace }}/packages/${{ matrix.distro.name }}/${{ matrix.arch }}/*.apk
+          done
 
       - name: Generate APK indexes for ${{ matrix.distro.name }}
         run: |
