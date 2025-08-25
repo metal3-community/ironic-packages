@@ -1,7 +1,7 @@
 package:
   name: py3-pycdlib
   description: Pure python ISO manipulation library
-  version: 1.14.0
+  version: 1.15.0
   epoch: 1
   copyright:
     - license: LGPL-2.0
@@ -21,7 +21,7 @@ pipeline:
     with:
       repository: https://github.com/clalancette/pycdlib
       tag: v${{package.version}}
-      expected-commit: 7a02e35e9f5a692e2a1bc355450d763d42299e7f
+      expected-commit: 67fe5ea7f68cf1185379c2c5e8acf37d483a2d4a
   - uses: python/build-wheel
   - uses: strip
 
