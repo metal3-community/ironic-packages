@@ -1,7 +1,7 @@
 package:
   name: py3-osprofiler
   description: OpenStack Profiler Library
-  version: 4.2.0
+  version: 4.3.0
   epoch: 1
   copyright:
     - license: Apache-2.0
@@ -30,7 +30,7 @@ pipeline:
     with:
       repository: https://github.com/openstack/osprofiler
       tag: ${{package.version}}
-      expected-commit: ba8f4f47cc67216cfcb2997eb6e6c7089723b590
+      expected-commit: 1db139c26e8bfa7602f5d3be63452fdb15ff82d5
   - uses: python/build-wheel
   - uses: strip
 
