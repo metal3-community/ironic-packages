@@ -1,7 +1,7 @@
 package:
   name: py3-oslo-service
   description: oslo.service library
-  version: 3.5.0
+  version: 4.2.2
   epoch: 1
   copyright:
     - license: Apache-2.0
@@ -34,7 +34,7 @@ pipeline:
     with:
       repository: https://github.com/openstack/oslo.service
       tag: ${{package.version}}
-      expected-commit: 979ada7f673d49e0b42c70829d19187eeee379d7
+      expected-commit: afddf2d622a4aac6015417fcd0cbc49cfa281eb0
   - uses: python/build-wheel
   - uses: strip
 
