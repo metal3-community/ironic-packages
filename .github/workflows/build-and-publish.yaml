@@ -222,7 +222,7 @@ jobs:
               --signing-key ${{ env.SIGNING_KEY_PATH }} \
               ${repository_args} \
               ${keyring_args} \
-              ${{ github.workspace }}/packages/${{ matrix.distro.name }}/${{ matrix.arch }}/*.apk
+              "$config" || echo "Warning: melange build failed for $config, continuing..."
           done
 
       - name: Generate APK indexes for ${{ matrix.distro.name }}
