@@ -35,6 +35,7 @@ permissions:
   id-token: write
 
 env:
+  MELANGE_VERSION: 0.30.6
   SIGNING_KEY_PATH: ${{ github.workspace }}/melange.rsa
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
@@ -120,6 +121,31 @@ jobs:
             echo "packages=$(cat packages.json)" >> $GITHUB_OUTPUT
           fi
 
+      - id: setup-melange-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /usr/local/bin/melange
+          key: melange-cache-amd64
+
+      - name: Install melange
+        if: steps.setup-melange-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -sL "https://github.com/chainguard-dev/melange/releases/download/v${{ env.MELANGE_VERSION }}/melange_${{ env.MELANGE_VERSION }}_linux_amd64.tar.gz" \
+          | tar xvz --strip-components=1
+          sudo mv melange /usr/local/bin/
+          chmod +x /usr/local/bin/melange
+
+      - uses: chainguard-dev/actions/melange-keygen@0cda751b114eb55c388e88f7479292668165602a # v1.0.2
+        with:
+          signing-key-path: ${{ env.SIGNING_KEY_PATH }}
+
+      - name: Upload packages artifacts for signing keys
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: signing-keys
+          path: ${{ env.SIGNING_KEY_PATH }}*
+          retention-days: 30
+
   build-packages:
     name: Build APK Packages
     strategy:
@@ -154,31 +180,27 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install APT dependencies
-        run: |
-          sudo apt update && \
-          sudo apt install -y \
-            bubblewrap \
-            qemu-user-static
-
       - id: setup-melange-cache
         uses: actions/cache/restore@v4
         with:
           path: /usr/local/bin/melange
-          key: melange-cache-${{ github.run_id }}-${{ github.run_attempt }}
+          key: melange-cache-${{ matrix.arch }}
 
       - name: Install melange
         if: steps.setup-melange-cache.outputs.cache-hit != 'true'
         env:
           IMG_ARCH: ${{ matrix.arch == 'aarch64' && 'arm64' || 'amd64' }}
         run: |
-          # Install melange from the official releases
-          MELANGE_VERSION="0.30.6"
-
-          curl -sL "https://github.com/chainguard-dev/melange/releases/download/v${MELANGE_VERSION}/melange_${MELANGE_VERSION}_linux_${IMG_ARCH}.tar.gz" \
+          curl -sL "https://github.com/chainguard-dev/melange/releases/download/v${{ env.MELANGE_VERSION }}/melange_${{ env.MELANGE_VERSION }}_linux_${IMG_ARCH}.tar.gz" \
           | tar xvz --strip-components=1
           sudo mv melange /usr/local/bin/
           chmod +x /usr/local/bin/melange
+
+      - name: Download package signing keys
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: signing-keys
+          path: ${{ env.SIGNING_KEY_PATH }}*
 
       - name: Download all package artifacts
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
@@ -192,10 +214,6 @@ jobs:
           mkdir -p workspace
           mkdir -p cache
           mkdir -p packages/${{ matrix.distro.name }}/${{ matrix.arch }}
-
-      - uses: chainguard-dev/actions/melange-keygen@0cda751b114eb55c388e88f7479292668165602a # v1.0.2
-        with:
-          signing-key-path: ${{ env.SIGNING_KEY_PATH }}
 
       - name: Melange Build
         env:
@@ -273,6 +291,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
+      - name: Download package signing keys
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: signing-keys
+          path: ${{ env.SIGNING_KEY_PATH }}*
+
       - name: Download all package artifacts
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
@@ -282,6 +306,11 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+
+      - name: Move signing keys
+        run: |
+          mv ${{ env.SIGNING_KEY_PATH }} ./packages/
+          mv ${{ env.SIGNING_KEY_PATH }}.pub ./packages/
 
       - name: Organize repository structure
         run: |
