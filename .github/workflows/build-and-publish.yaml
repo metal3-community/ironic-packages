@@ -124,6 +124,7 @@ jobs:
     name: Build APK Packages
     strategy:
       matrix:
+        arch: [x86_64, aarch64]
         distro:
           - name: alpine
             repository: |
@@ -136,7 +137,6 @@ jobs:
             repository: |
               https://packages.wolfi.dev/os
             keyring: https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
-        arch: [x86_64, aarch64]
       fail-fast: false
     needs: detect-changes
     if: github.repository == 'metal3-community/ironic-packages' && needs.detect-changes.outputs.packages != '[]'
