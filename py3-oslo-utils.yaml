@@ -1,7 +1,7 @@
 package:
   name: py3-oslo-utils
   description: Oslo Utility library
-  version: 7.3.0
+  version: 9.1.0
   epoch: 1
   copyright:
     - license: Apache-2.0
@@ -28,7 +28,7 @@ pipeline:
     with:
       repository: https://github.com/openstack/oslo.utils
       tag: ${{package.version}}
-      expected-commit: c5d589f2c266dfcd0900e09ea76394f3be457d16
+      expected-commit: a25c51f780837ef1ff411114dd8a09b64bb57c9b
   - uses: python/build-wheel
   - uses: strip
 
