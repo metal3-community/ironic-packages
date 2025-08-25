@@ -14,7 +14,6 @@ package:
       - py3-construct
       - py3-eventlet
       - py3-futurist
-      - py3-ironic-lib
       - py3-jinja2
       - py3-jsonpatch
       - py3-jsonschema
