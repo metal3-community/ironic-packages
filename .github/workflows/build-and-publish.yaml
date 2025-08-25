@@ -199,7 +199,6 @@ jobs:
 
       - name: Melange Build
         env:
-          MELANGE_RUNNER: docker  # Use docker runner to avoid bubblewrap issues
           KEYRING: ${{ matrix.distro.keyring }}
           REPOSITORY: ${{ matrix.distro.repository }}
           CONFIGS: ${{ join(fromJSON(env.PACKAGES_TO_BUILD), ',') }}
@@ -220,6 +219,7 @@ jobs:
               --out-dir ./packages/${{ matrix.distro.name }} \
               --log-level info \
               --signing-key ${{ env.SIGNING_KEY_PATH }} \
+              --runner docker \
               ${repository_args} \
               ${keyring_args} \
               "$config" || echo "Warning: melange build failed for $config, continuing..."

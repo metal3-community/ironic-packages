@@ -3,8 +3,6 @@ package:
   description: Oslo Database library
   version: 16.0.0
   epoch: 2
-  target-architecture:
-    - all
   copyright:
     - license: Apache-2.0
   dependencies:

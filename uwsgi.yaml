@@ -3,8 +3,6 @@ package:
   description: uWSGI application server container
   version: 2.0.28
   epoch: 0
-  target-architecture:
-    - all
   copyright:
     - license: GPL-2.0-only
 

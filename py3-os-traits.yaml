@@ -3,8 +3,6 @@ package:
   description: A library containing standardized trait strings
   version: 3.1.0
   epoch: 1
-  target-architecture:
-    - all
   copyright:
     - license: Apache-2.0
   dependencies:

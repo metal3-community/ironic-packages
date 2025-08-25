@@ -3,8 +3,6 @@ package:
   description: Oslo Context library
   version: 5.6.0
   epoch: 1
-  target-architecture:
-    - all
   copyright:
     - license: Apache-2.0
   dependencies:

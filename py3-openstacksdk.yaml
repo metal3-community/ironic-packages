@@ -3,8 +3,6 @@ package:
   description: An SDK for building applications to work with OpenStack
   version: "4.7.0"
   epoch: 0
-  target-architecture:
-    - all
   copyright:
     - license: Apache-2.0
   dependencies:
