@@ -202,6 +202,7 @@ jobs:
           namespace: ${{ matrix.distro.name }}
           multi-config: ${{ join(fromJSON(env.PACKAGES_TO_BUILD), ',') }}
           archs: ${{ matrix.arch }}
+          sign-with-key: true
           signing-key-path: ${{ env.SIGNING_KEY_PATH }}
           repository-path: ${{ github.workspace }}/packages/${{ matrix.distro.name }}
           repository-append: |
