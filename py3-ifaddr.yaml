@@ -1,0 +1,36 @@
+package:
+  name: py3-ifaddr
+  description: Cross-platform network interface and IP address enumeration library
+  version: "0.2.0"
+  epoch: 1
+  copyright:
+    - license: MIT
+  dependencies:
+    provider-priority: 0
+environment:
+  contents:
+    packages:
+      - busybox
+      - py3-build
+      - py3-installer
+      - py3-pbr
+      - python3
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/pydron/ifaddr
+      tag: ${{package.version}}
+      expected-commit: 78683e0f93e1fb7dd8e6430f79f0ce15bc9ab148
+  - uses: python/build-wheel
+  - uses: strip
+var-transforms:
+  - from: ${{package.name}}
+    match: ^py3-(.+)$
+    replace: $1
+    to: import
+test:
+  pipeline:
+    - uses: python/import
+      with:
+        imports: |
+          import ${{vars.import}}
