@@ -23,6 +23,7 @@ package:
       - py3-microversion-parse
       - py3-netaddr
       - py3-openstacksdk
+      - py3-os-service-types
       - py3-os-traits
       - py3-oslo-concurrency
       - py3-oslo-config
@@ -50,6 +51,7 @@ package:
       - py3-tenacity
       - py3-tooz
       - py3-webob
+      - websockify
 
 var-transforms:
   - from: ${{package.name}}
