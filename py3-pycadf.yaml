@@ -1,29 +1,12 @@
 package:
-  name: py3-ironic-python-agent
-  description: OpenStack Bare Metal Provisioning Agent
-  version: 11.1.0
+  name: py3-pycadf
+  description: CADF Library
+  version: 4.0.1
   epoch: 1
   copyright:
     - license: Apache-2.0
   dependencies:
     provider-priority: 0
-    runtime:
-      - py3-pbr
-      - py3-oslo-config
-      - py3-oslo-concurrency
-      - py3-oslo-log
-      - py3-oslo-utils
-      - py3-pint
-      - py3-psutil
-      - py3-udev
-      - py3-requests
-      - py3-stevedore
-      - py3-tenacity
-      - py3-werkzeug
-      - py3-cryptography
-      - py3-tooz
-      - py3-zeroconf
-      - py3-cheroot
 
 var-transforms:
   - from: ${{package.name}}
