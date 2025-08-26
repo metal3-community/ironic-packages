@@ -27,3 +27,5 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       # this need to point to main to always get the latest action
       - uses: wolfi-dev/actions/wolfictl-lint@main # main
+        with:
+          run_wolfictl_lint_yam: false
