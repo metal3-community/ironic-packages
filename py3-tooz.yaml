@@ -43,7 +43,7 @@ environment:
 pipeline:
   - runs: |
       wget -T5 --tries=5 https://files.pythonhosted.org/packages/py3/${{vars.prefix}}/${{vars.package}}/${{vars.import}}-${{package.version}}-py3-none-any.whl
-      pip install --no-deps --no-cache-dir --prefix=/ --root=${{targets.destdir}} ${{vars.import}}-${{package.version}}-py3-none-any.whl
+      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.import}}-${{package.version}}-py3-none-any.whl
 
 test:
   pipeline:

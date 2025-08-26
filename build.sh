@@ -12,12 +12,12 @@ trap cleanup SIGINT
 
 docker run --rm -v "${PWD}":/work docker.io/chainguard/melange keygen
 
-for p in py3-*.yaml uwsgi.yaml; do
+for p in py3-*.yaml; do
   # Skip if the file doesn't exist (in case uwsgi.yaml doesn't exist)
   if [[ ! -f "$p" ]]; then
     continue
   fi
-  
+
   echo "Building package: $p"
   GOFLAGS="" GOTOOLCHAIN=local docker run --rm --privileged --platform linux/arm64 -v "${PWD}:/work" \
     docker.io/chainguard/melange:latest build "${p}" \
