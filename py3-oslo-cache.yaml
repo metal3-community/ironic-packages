@@ -8,12 +8,12 @@ package:
   dependencies:
     provider-priority: 0
     runtime:
+      - py3-debtcollector
       - py3-dogpile-cache
       - py3-oslo-config
       - py3-oslo-i18n
       - py3-oslo-log
       - py3-oslo-utils
-      - py3-python-memcached
 
 var-transforms:
   - from: ${{package.name}}
