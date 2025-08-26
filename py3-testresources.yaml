@@ -1,0 +1,54 @@
+package:
+  name: py3-testresources
+  description: Testresources, a pyunit extension for managing expensive test resources
+  version: 2.0.2
+  epoch: 1
+  copyright:
+    - license: BSD-2-Clause
+    - license: Apache-2.0
+  dependencies:
+    provider-priority: 0
+
+var-transforms:
+  - from: ${{package.name}}
+    match: ^py3-([a-z]).+$
+    replace: $1
+    to: prefix
+  - from: ${{package.name}}
+    match: ^py3-(.+)$
+    replace: $1
+    to: package
+  - from: ${{vars.package}}
+    match: "-"
+    replace: "_"
+    to: import
+
+environment:
+  contents:
+    packages:
+      - busybox
+      - build-base
+      - wget
+      - ca-certificates-bundle
+      - python3
+      - python3-dev
+      - py3-pip
+      - py3-build
+
+pipeline:
+  - runs: |
+      bn=${{vars.import}}-${{package.version}}.tar.gz
+      wget -T5 --tries=5 https://files.pythonhosted.org/packages/source/${{vars.prefix}}/${{vars.package}}/$bn
+      tar -xz --strip-components=1 -C . -f $bn
+      rm $bn
+      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} .
+
+test:
+  pipeline:
+    - uses: python/import
+      with:
+        imports: |
+          import ${{vars.import}}
+
+update:
+  enabled: true
