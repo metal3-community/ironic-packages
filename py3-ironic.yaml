@@ -38,6 +38,7 @@ package:
       - py3-oslo-utils
       - py3-oslo-versionedobjects
       - py3-osprofiler
+      - py3-pbr
       - py3-pecan
       - py3-psutil
       - py3-pycdlib
