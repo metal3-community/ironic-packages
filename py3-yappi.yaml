@@ -40,7 +40,7 @@ pipeline:
       wget -T5 --tries=5 https://files.pythonhosted.org/packages/source/${{vars.prefix}}/${{vars.package}}/$bn
       tar -xz --strip-components=1 -C . -f $bn
       rm $bn
-      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} .
+      pip install --no-deps --no-cache-dir --prefix=/ --root=${{targets.destdir}} .
 
 test:
   pipeline:
