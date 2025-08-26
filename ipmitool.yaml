@@ -1,0 +1,58 @@
+package:
+  name: ipmitool
+  version: 1.8.19
+  epoch: 0
+  description: An open-source tool for controlling IPMI-enabled systems
+  copyright:
+    - license: BSD-3-Clause
+  dependencies:
+    runtime:
+
+var-transforms:
+  - from: ${{package.version}}
+    match: '\.'
+    replace: _
+    to: version_macro
+
+environment:
+  contents:
+    packages:
+      - acl
+      - wget
+      - readline-dev
+      - libtool
+      - busybox
+      - build-base
+      - ca-certificates-bundle
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/ipmitool/ipmitool
+      tag: IPMITOOL_${{vars.version_macro}}
+      expected-commit: 19d78782d795d0cf4ceefe655f616210c9143e62
+  - uses: autoconf/configure
+    with:
+      opts: |
+        --bindir=/usr/bin \
+        --enable-ipmievd \
+        --enable-ipmishell \
+        --enable-intf-lan \
+        --enable-intf-lanplus \
+        --enable-intf-open \
+        --disable-intf-free \
+        --disable-intf-imb \
+        --disable-intf-lipmi \
+        --disable-intf-bmc \
+        --disable-internal-md5 \
+        --with-kerneldir=/usr
+  - uses: autoconf/make
+  - uses: autoconf/make-install
+  - runs: |
+      mv ${{targets.destdir}}/usr/sbin/* ${{targets.destdir}}/usr/bin/
+      rm -rf ${{targets.destdir}}/usr/sbin
+
+test:
+  pipeline:
+    - runs: |
+        ipmitool --version

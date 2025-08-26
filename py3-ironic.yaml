@@ -51,6 +51,7 @@ package:
       - py3-tenacity
       - py3-tooz
       - py3-webob
+      - py3-zeroconf
       - websockify
 
 var-transforms:
