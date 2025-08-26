@@ -11,6 +11,7 @@ package:
       - py3-alembic
       - py3-automaton
       - py3-bcrypt
+      - py3-cheroot
       - py3-construct
       - py3-eventlet
       - py3-futurist
@@ -29,7 +30,6 @@ package:
       - py3-oslo-messaging
       - py3-oslo-middleware
       - py3-oslo-policy
-      - py3-oslo-rootwrap
       - py3-oslo-serialization
       - py3-oslo-service
       - py3-oslo-upgradecheck
@@ -40,7 +40,7 @@ package:
       - py3-psutil
       - py3-pycdlib
       - py3-requests
-      - py3-rfc3986
+      - py3-rfc3986-validator
       - py3-sqlalchemy
       - py3-stevedore
       - py3-sushy
@@ -48,29 +48,33 @@ package:
       - py3-tooz
       - py3-webob
 
+var-transforms:
+  - from: ${{package.name}}
+    match: ^py3-([a-z]).+$
+    replace: $1
+    to: prefix
+  - from: ${{package.name}}
+    match: ^py3-(.+)$
+    replace: $1
+    to: package
+  - from: ${{vars.package}}
+    match: "-"
+    replace: "_"
+    to: import
+
 environment:
   contents:
     packages:
       - busybox
-      - py3-build
-      - py3-installer
-      - py3-setuptools
+      - wget
+      - ca-certificates-bundle
       - python3
+      - py3-pip
 
 pipeline:
-  - uses: git-checkout
-    with:
-      repository: https://github.com/openstack/ironic
-      tag: ${{package.version}}
-      expected-commit: 90346e5985e2020daf937597c0f875b21c153f78
-  - uses: python/build-wheel
-  - uses: strip
-
-var-transforms:
-  - from: ${{package.name}}
-    match: ^py3-(.+)$
-    replace: $1
-    to: import
+  - runs: |
+      wget -T5 --tries=5 https://files.pythonhosted.org/packages/py3/${{vars.prefix}}/${{vars.package}}/${{vars.import}}-${{package.version}}-py3-none-any.whl
+      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.import}}-${{package.version}}-py3-none-any.whl
 
 test:
   pipeline:
@@ -78,3 +82,6 @@ test:
       with:
         imports: |
           import ${{vars.import}}
+
+update:
+  enabled: true

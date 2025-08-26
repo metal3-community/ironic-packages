@@ -20,33 +20,40 @@ package:
       - py3-yaml
       - py3-requestsexceptions
 
+var-transforms:
+  - from: ${{package.name}}
+    match: ^py3-([a-z]).+$
+    replace: $1
+    to: prefix
+  - from: ${{package.name}}
+    match: ^py3-(.+)$
+    replace: $1
+    to: package
+  - from: ${{vars.package}}
+    match: "-"
+    replace: "_"
+    to: import
+
 environment:
   contents:
     packages:
       - busybox
-      - py3-build
-      - py3-installer
-      - py3-setuptools
+      - wget
+      - ca-certificates-bundle
       - python3
+      - py3-pip
 
 pipeline:
-  - uses: git-checkout
-    with:
-      repository: https://github.com/openstack/openstacksdk
-      tag: ${{package.version}}
-      expected-commit: f1e2760a6f040e710d77a7ed30250c3de2e28dde
-  - uses: python/build-wheel
-  - uses: strip
-
-var-transforms:
-  - from: ${{package.name}}
-    match: ^py3-(.+)$
-    replace: $1
-    to: import
+  - runs: |
+      wget -T5 --tries=5 https://files.pythonhosted.org/packages/py3/${{vars.prefix}}/${{vars.package}}/${{vars.import}}-${{package.version}}-py3-none-any.whl
+      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.import}}-${{package.version}}-py3-none-any.whl
 
 test:
   pipeline:
     - uses: python/import
       with:
         imports: |
-          import openstack
+          import ${{vars.import}}
+
+update:
+  enabled: true

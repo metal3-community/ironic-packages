@@ -1,7 +1,7 @@
 package:
   name: py3-cotyledon
   description: Cotyledon provides a framework for defining long-running services.
-  version: 1.7.3
+  version: 2.0.0
   epoch: 1
   copyright:
     - license: Apache-2.0
@@ -10,29 +10,33 @@ package:
     runtime:
       - py3-setproctitle
 
+var-transforms:
+  - from: ${{package.name}}
+    match: ^py3-([a-z]).+$
+    replace: $1
+    to: prefix
+  - from: ${{package.name}}
+    match: ^py3-(.+)$
+    replace: $1
+    to: package
+  - from: ${{vars.package}}
+    match: "-"
+    replace: "_"
+    to: import
+
 environment:
   contents:
     packages:
       - busybox
-      - py3-build
-      - py3-installer
-      - py3-setproctitle
+      - wget
+      - ca-certificates-bundle
       - python3
+      - py3-pip
 
 pipeline:
-  - uses: git-checkout
-    with:
-      repository: https://github.com/sileht/cotyledon
-      tag: ${{package.version}}
-      expected-commit: 4d0589aaa3f41542b589ea645e39a9da93d37d71
-  - uses: python/build-wheel
-  - uses: strip
-
-var-transforms:
-  - from: ${{package.name}}
-    match: ^py3-(.+)$
-    replace: $1
-    to: import
+  - runs: |
+      wget -T5 --tries=5 https://files.pythonhosted.org/packages/py3/${{vars.prefix}}/${{vars.package}}/${{vars.import}}-${{package.version}}-py3-none-any.whl
+      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.import}}-${{package.version}}-py3-none-any.whl
 
 test:
   pipeline:
@@ -40,3 +44,6 @@ test:
       with:
         imports: |
           import ${{vars.import}}
+
+update:
+  enabled: true

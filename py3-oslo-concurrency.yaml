@@ -1,7 +1,7 @@
 package:
   name: py3-oslo-concurrency
   description: Oslo Concurrency library
-  version: 6.1.0
+  version: 7.2.0
   epoch: 1
   copyright:
     - license: Apache-2.0
@@ -12,29 +12,37 @@ package:
       - py3-oslo-config
       - py3-oslo-utils
 
+var-transforms:
+  - from: ${{package.name}}
+    match: ^py3-([a-z]).+$
+    replace: $1
+    to: prefix
+  - from: ${{package.name}}
+    match: ^py3-(.+)$
+    replace: $1
+    to: package
+  - from: ${{vars.package}}
+    match: "-"
+    replace: "_"
+    to: file
+  - from: ${{vars.package}}
+    match: "-"
+    replace: "."
+    to: import
+
 environment:
   contents:
     packages:
       - busybox
-      - py3-build
-      - py3-installer
-      - py3-setuptools
+      - wget
+      - ca-certificates-bundle
       - python3
+      - py3-pip
 
 pipeline:
-  - uses: git-checkout
-    with:
-      repository: https://github.com/openstack/oslo.concurrency
-      tag: ${{package.version}}
-      expected-commit: 4f60166c72931d436f7df54b23de75a3e67780a5
-  - uses: python/build-wheel
-  - uses: strip
-
-var-transforms:
-  - from: ${{package.name}}
-    match: ^py3-(.+)$
-    replace: $1
-    to: import
+  - runs: |
+      wget -T5 --tries=5 https://files.pythonhosted.org/packages/py3/${{vars.prefix}}/${{vars.package}}/${{vars.file}}-${{package.version}}-py3-none-any.whl
+      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.file}}-${{package.version}}-py3-none-any.whl
 
 test:
   pipeline:
@@ -42,3 +50,6 @@ test:
       with:
         imports: |
           import ${{vars.import}}
+
+update:
+  enabled: true

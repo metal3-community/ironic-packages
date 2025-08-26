@@ -1,13 +1,12 @@
 package:
-  name: py3-pycdlib
-  description: Pure python ISO manipulation library
-  version: 1.14.0
-  epoch: 1
+  name: py3-rfc3986-validator
+  version: 0.1.1
+  epoch: 6
+  description: Pure python rfc3986 validator
   copyright:
-    - license: LGPL-2.0
+    - license: MIT
   dependencies:
     provider-priority: 0
-
 var-transforms:
   - from: ${{package.name}}
     match: ^py3-([a-z]).+$
@@ -26,10 +25,13 @@ environment:
   contents:
     packages:
       - busybox
+      - build-base
       - wget
       - ca-certificates-bundle
       - python3
+      - python3-dev
       - py3-pip
+      - py3-build
 
 pipeline:
   - runs: |

@@ -1,10 +1,10 @@
 package:
-  name: py3-pycdlib
-  description: Pure python ISO manipulation library
-  version: 1.14.0
+  name: py3-dogpile-cache
+  description: A caching front-end based on the Dogpile lock.
+  version: 1.4.0
   epoch: 1
   copyright:
-    - license: LGPL-2.0
+    - license: MIT
   dependencies:
     provider-priority: 0
 
@@ -20,6 +20,10 @@ var-transforms:
   - from: ${{vars.package}}
     match: "-"
     replace: "_"
+    to: file
+  - from: ${{vars.package}}
+    match: "-"
+    replace: "."
     to: import
 
 environment:
@@ -33,11 +37,8 @@ environment:
 
 pipeline:
   - runs: |
-      bn=${{vars.import}}-${{package.version}}.tar.gz
-      wget -T5 --tries=5 https://files.pythonhosted.org/packages/source/${{vars.prefix}}/${{vars.package}}/$bn
-      tar -xz --strip-components=1 -C . -f $bn
-      rm $bn
-      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} .
+      wget -T5 --tries=5 https://files.pythonhosted.org/packages/py3/${{vars.prefix}}/${{vars.package}}/${{vars.file}}-${{package.version}}-py3-none-any.whl
+      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.file}}-${{package.version}}-py3-none-any.whl
 
 test:
   pipeline:

@@ -1,10 +1,10 @@
 package:
-  name: py3-pycdlib
-  description: Pure python ISO manipulation library
-  version: 1.14.0
+  name: py3-yappi
+  description: Yet Another Python Profiler
+  version: 1.6.10
   epoch: 1
   copyright:
-    - license: LGPL-2.0
+    - license: MIT
   dependencies:
     provider-priority: 0
 
@@ -26,10 +26,13 @@ environment:
   contents:
     packages:
       - busybox
+      - build-base
       - wget
       - ca-certificates-bundle
       - python3
+      - python3-dev
       - py3-pip
+      - py3-build
 
 pipeline:
   - runs: |
