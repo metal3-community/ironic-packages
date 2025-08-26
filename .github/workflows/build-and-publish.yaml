@@ -243,26 +243,6 @@ jobs:
               "$config" || echo "Warning: melange build failed for $config, continuing..."
           done
 
-      - name: Generate APK indexes for ${{ matrix.distro.name }}
-        run: |
-          packages_dir="packages/${{ matrix.distro.name }}/${{ matrix.arch }}"
-          if [[ -d "$packages_dir" ]] && [[ $(ls -1 "${packages_dir}"/*.apk 2>/dev/null | wc -l) -gt 0 ]]; then
-            echo "Generating APKINDEX for ${{ matrix.distro.name }}/${{ matrix.arch }}"
-            signing_key="$(readlink -f ${{ env.SIGNING_KEY_PATH }})"
-            cd "$packages_dir"
-
-            # Remove any existing APKINDEX to avoid merge conflicts
-            rm -f APKINDEX.tar.gz APKINDEX.unsigned.tar.gz
-
-            # Generate new APKINDEX
-            melange index \
-              --signing-key "${signing_key}" \
-              *.apk || echo "Warning: Failed to generate APKINDEX, continuing..."
-            cd - > /dev/null
-          else
-            echo "No packages found for ${{ matrix.distro.name }}/${{ matrix.arch }}, skipping index generation"
-          fi
-
       - name: Upload packages artifacts for ${{ matrix.distro.name }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
