@@ -9,12 +9,15 @@ package:
     provider-priority: 0
     runtime:
       - py3-bcrypt
+      - py3-debtcollector
       - py3-jinja2
       - py3-oslo-config
       - py3-oslo-context
+      - py3-oslo-i18n
       - py3-oslo-utils
       - py3-statsd
       - py3-stevedore
+      - py3-typing-extensions
       - py3-webob
 
 var-transforms:

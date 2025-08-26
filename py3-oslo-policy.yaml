@@ -10,6 +10,7 @@ package:
     runtime:
       - py3-oslo-config
       - py3-oslo-context
+      - py3-oslo-i18n
       - py3-oslo-serialization
       - py3-oslo-utils
       - py3-pyyaml

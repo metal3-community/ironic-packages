@@ -10,7 +10,7 @@ package:
     runtime:
       - py3-msgpack
       - py3-oslo-utils
-      - py3-tz
+      - py3-tzdata
 
 var-transforms:
   - from: ${{package.name}}

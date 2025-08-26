@@ -8,11 +8,11 @@ package:
   dependencies:
     provider-priority: 0
     runtime:
-      - py3-iso8601
       - py3-netaddr
       - py3-oslo-concurrency
       - py3-oslo-config
       - py3-oslo-context
+      - py3-oslo-i18n
       - py3-oslo-log
       - py3-oslo-messaging
       - py3-oslo-serialization

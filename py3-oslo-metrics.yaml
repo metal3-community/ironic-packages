@@ -8,19 +8,10 @@ package:
   dependencies:
     provider-priority: 0
     runtime:
-      - py3-amqp
-      - py3-cachetools
-      - py3-futurist
-      - py3-kombu
       - py3-oslo-config
-      - py3-oslo-context
       - py3-oslo-log
-      - py3-oslo-serialization
-      - py3-oslo-service
       - py3-oslo-utils
-      - py3-stevedore
-      - py3-webob
-      - py3-pyyaml
+      - py3-prometheus-client
 
 var-transforms:
   - from: ${{package.name}}

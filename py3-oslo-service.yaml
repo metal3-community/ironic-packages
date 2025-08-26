@@ -8,10 +8,12 @@ package:
   dependencies:
     provider-priority: 0
     runtime:
+      - py3-debtcollector
       - py3-eventlet
       - py3-greenlet
       - py3-oslo-concurrency
       - py3-oslo-config
+      - py3-oslo-i18n
       - py3-oslo-log
       - py3-oslo-utils
       - py3-paste
