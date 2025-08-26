@@ -1,25 +1,12 @@
 package:
-  name: py3-openstacksdk
-  description: An SDK for building applications to work with OpenStack
-  version: "4.7.0"
-  epoch: 0
+  name: py3-proliantutils
+  description: Utility libraries for interfacing and managing various components (like iLO, HPSSA) for HPE Proliant Servers.
+  version: 2.16.3
+  epoch: 1
   copyright:
     - license: Apache-2.0
   dependencies:
     provider-priority: 0
-    runtime:
-      - py3-cryptography
-      - py3-decorator
-      - py3-dogpile-cache
-      - py3-iso8601
-      - py3-jmespath
-      - py3-jsonpatch
-      - py3-netifaces
-      - py3-os-service-types
-      - py3-platformdirs
-      - py3-pyyaml
-      - py3-requestsexceptions
-      - py3-typing-extensions
 
 var-transforms:
   - from: ${{package.name}}

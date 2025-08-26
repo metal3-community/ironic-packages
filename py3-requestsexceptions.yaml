@@ -1,0 +1,50 @@
+package:
+  name: py3-requestsexceptions
+  description: Import exceptions from potentially bundled packages in requests.
+  version: 1.4.0
+  epoch: 1
+  copyright:
+    - license: Apache-2.0
+  dependencies:
+    provider-priority: 0
+
+var-transforms:
+  - from: ${{package.name}}
+    match: ^py3-([a-z]).+$
+    replace: $1
+    to: prefix
+  - from: ${{package.name}}
+    match: ^py3-(.+)$
+    replace: $1
+    to: package
+  - from: ${{vars.package}}
+    match: "-"
+    replace: "_"
+    to: import
+
+environment:
+  contents:
+    packages:
+      - busybox
+      - wget
+      - ca-certificates-bundle
+      - python3
+      - py3-pip
+
+pipeline:
+  - runs: |
+      bn=${{vars.import}}-${{package.version}}.tar.gz
+      wget -T5 --tries=5 https://files.pythonhosted.org/packages/source/${{vars.prefix}}/${{vars.package}}/$bn
+      tar -xz --strip-components=1 -C . -f $bn
+      rm $bn
+      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} .
+
+test:
+  pipeline:
+    - uses: python/import
+      with:
+        imports: |
+          import ${{vars.import}}
+
+update:
+  enabled: true

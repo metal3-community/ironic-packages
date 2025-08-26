@@ -1,25 +1,17 @@
 package:
-  name: py3-openstacksdk
-  description: An SDK for building applications to work with OpenStack
-  version: "4.7.0"
-  epoch: 0
+  name: py3-ironic-prometheus-exporter
+  description: Ironic Prometheus Exporter is a Tool to expose hardware sensor data in the Prometheus format through an HTTP endpoint.
+  version: 4.5.0
+  epoch: 1
   copyright:
     - license: Apache-2.0
   dependencies:
     provider-priority: 0
     runtime:
-      - py3-cryptography
-      - py3-decorator
-      - py3-dogpile-cache
-      - py3-iso8601
-      - py3-jmespath
-      - py3-jsonpatch
-      - py3-netifaces
-      - py3-os-service-types
-      - py3-platformdirs
-      - py3-pyyaml
-      - py3-requestsexceptions
-      - py3-typing-extensions
+      - py3-flask
+      - py3-oslo-messaging
+      - py3-prometheus-client
+      - py3-stevedore
 
 var-transforms:
   - from: ${{package.name}}
