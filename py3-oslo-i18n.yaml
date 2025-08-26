@@ -1,20 +1,12 @@
 package:
-  name: py3-oslo-policy
-  description: Oslo Policy library
-  version: 4.6.0
+  name: py3-oslo-i18n
+  description: Oslo i18n library
+  version: 6.6.0
   epoch: 1
   copyright:
     - license: Apache-2.0
   dependencies:
     provider-priority: 0
-    runtime:
-      - py3-oslo-config
-      - py3-oslo-context
-      - py3-oslo-serialization
-      - py3-oslo-utils
-      - py3-pyyaml
-      - py3-requests
-      - py3-stevedore
 
 var-transforms:
   - from: ${{package.name}}

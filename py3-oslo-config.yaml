@@ -9,7 +9,7 @@ package:
     provider-priority: 0
     runtime:
       - py3-netaddr
-      - py3-yaml
+      - py3-pyyaml
       - py3-requests
       - py3-rfc3986-validator
       - py3-stevedore

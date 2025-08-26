@@ -8,11 +8,14 @@ package:
   dependencies:
     provider-priority: 0
     runtime:
+      - py3-debtcollector
       - py3-iso8601
       - py3-netaddr
       - py3-netifaces
-      - py3-yaml
-      - py3-tz
+      - py3-oslo-i18n
+      - py3-pyparsing
+      - py3-pyyaml
+      - py3-tzdata
 
 var-transforms:
   - from: ${{package.name}}

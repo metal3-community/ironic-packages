@@ -20,7 +20,7 @@ package:
       - py3-oslo-serialization
       - py3-oslo-service
       - py3-oslo-utils
-      - py3-yaml
+      - py3-pyyaml
       - py3-stevedore
       - py3-webob
 
