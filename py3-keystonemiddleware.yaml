@@ -1,53 +1,27 @@
 package:
-  name: py3-ironic
-  description: OpenStack Bare Metal Provisioning
-  version: 31.0.0
-  epoch: 1
+  name: py3-keystonemiddleware
+  description: Middleware for OpenStack Identity
+  version: 10.12.0
+  epoch: 2
   copyright:
     - license: Apache-2.0
   dependencies:
     provider-priority: 0
     runtime:
-      - py3-alembic
-      - py3-automaton
-      - py3-bcrypt
-      - py3-cheroot
-      - py3-construct
-      - py3-eventlet
-      - py3-futurist
-      - py3-jinja2
-      - py3-jsonpatch
-      - py3-jsonschema
+      - py3-cryptography
       - py3-keystoneauth1
-      - py3-keystonemiddleware
-      - py3-microversion-parse
-      - py3-netaddr
-      - py3-openstacksdk
-      - py3-os-traits
-      - py3-oslo-concurrency
+      - py3-oslo-cache
       - py3-oslo-config
       - py3-oslo-context
-      - py3-oslo-db
+      - py3-oslo-i18n
       - py3-oslo-log
-      - py3-oslo-messaging
-      - py3-oslo-middleware
-      - py3-oslo-policy
       - py3-oslo-serialization
-      - py3-oslo-service
-      - py3-oslo-upgradecheck
       - py3-oslo-utils
-      - py3-oslo-versionedobjects
-      - py3-osprofiler
-      - py3-pecan
-      - py3-psutil
-      - py3-pycdlib
+      - py3-pbr
+      - py3-pycadf
+      - py3-pyjwt
+      - py3-python-keystoneclient
       - py3-requests
-      - py3-rfc3986
-      - py3-sqlalchemy
-      - py3-stevedore
-      - py3-sushy
-      - py3-tenacity
-      - py3-tooz
       - py3-webob
 
 var-transforms:
