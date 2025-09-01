@@ -135,7 +135,7 @@ jobs:
           sudo mv melange /usr/local/bin/
           chmod +x /usr/local/bin/melange
 
-      - uses: chainguard-dev/actions/melange-keygen@0cda751b114eb55c388e88f7479292668165602a # v1.0.2
+      - uses: chainguard-dev/actions/melange-keygen@3caedd3784c809ba873cbb8c6a12e2bc6bf6ab09 # v1.4.13
         with:
           signing-key-path: ${{ env.SIGNING_KEY_PATH }}
 
