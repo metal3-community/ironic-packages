@@ -7,23 +7,6 @@ package:
     - license: Apache-2.0
   dependencies:
     provider-priority: 0
-    runtime:
-      - py3-pbr
-      - py3-oslo-config
-      - py3-oslo-concurrency
-      - py3-oslo-log
-      - py3-oslo-utils
-      - py3-pint
-      - py3-psutil
-      - py3-udev
-      - py3-requests
-      - py3-stevedore
-      - py3-tenacity
-      - py3-werkzeug
-      - py3-cryptography
-      - py3-tooz
-      - py3-zeroconf
-      - py3-cheroot
 
 var-transforms:
   - from: ${{package.name}}
@@ -43,15 +26,21 @@ environment:
   contents:
     packages:
       - busybox
+      - build-base
       - wget
       - ca-certificates-bundle
       - python3
+      - python3-dev
       - py3-pip
+      - py3-build
 
 pipeline:
   - runs: |
-      wget -T5 --tries=5 https://files.pythonhosted.org/packages/py3/${{vars.prefix}}/${{vars.package}}/${{vars.import}}-${{package.version}}-py3-none-any.whl
-      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.import}}-${{package.version}}-py3-none-any.whl
+      bn=${{vars.import}}-${{package.version}}.tar.gz
+      wget -T5 --tries=5 https://files.pythonhosted.org/packages/source/${{vars.prefix}}/${{vars.package}}/$bn
+      tar -xz --strip-components=1 -C . -f $bn
+      rm $bn
+      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} .
 
 test:
   pipeline:
