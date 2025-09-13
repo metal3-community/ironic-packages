@@ -1,7 +1,7 @@
 package:
   name: py3-cotyledon
   description: Cotyledon provides a framework for defining long-running services.
-  version: 2.0.0
+  version: 2.1.0
   epoch: 1
   copyright:
     - license: Apache-2.0

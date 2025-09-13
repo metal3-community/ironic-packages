@@ -13,6 +13,7 @@ package:
       - py3-bcrypt
       - py3-cheroot
       - py3-construct
+      - py3-cotyledon
       - py3-eventlet
       - py3-futurist
       - py3-jinja2
