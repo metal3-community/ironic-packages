@@ -37,7 +37,7 @@ permissions:
 
 env:
   MELANGE_VERSION: 0.30.6
-  SIGNING_KEY_PATH: ${{ github.workspace }}/melange.rsa
+  SIGNING_KEY_PATH: melange.rsa
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
