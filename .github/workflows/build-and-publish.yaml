@@ -143,12 +143,9 @@ jobs:
       - name: Setup ORAS CLI
         uses: oras-project/setup-oras@v1
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: SignIn ORAS
+        run: |
+          oras login ghcr.io -u ${{ github.actor }} -p "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Push signing keys to registry
         run: |
@@ -215,12 +212,9 @@ jobs:
           sudo mv melange /usr/local/bin/
           chmod +x /usr/local/bin/melange
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: SignIn ORAS
+        run: |
+          oras login ghcr.io -u ${{ github.actor }} -p "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Pull signing keys from registry
         run: |
@@ -325,12 +319,9 @@ jobs:
       - name: Setup ORAS CLI
         uses: oras-project/setup-oras@v1
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: SignIn ORAS
+        run: |
+          oras login ghcr.io -u ${{ github.actor }} -p "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Pull signing keys from registry
         run: |
