@@ -159,6 +159,11 @@ jobs:
 
   build-packages:
     name: Build APK Packages
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      packages: write
     strategy:
       matrix:
         arch: [x86_64, aarch64]
@@ -293,6 +298,11 @@ jobs:
 
   publish-repository:
     name: Publish APK Repository to GitHub Pages
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      packages: write
     runs-on: ubuntu-latest
     needs: [detect-changes, build-packages]
     if: |
