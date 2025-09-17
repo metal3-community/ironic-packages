@@ -38,8 +38,6 @@ permissions:
 env:
   MELANGE_VERSION: 0.30.6
   SIGNING_KEY_PATH: melange.rsa
-  SIGNING_KEY_TAG: signing-keys
-  TAG: latest
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
@@ -163,10 +161,11 @@ jobs:
           ls -la "${{ env.SIGNING_KEY_PATH }}"*
 
           # Push both private and public signing keys to registry
-          echo "Pushing signing keys to ghcr.io/${{ github.repository }}:${{ env.SIGNING_KEY_TAG }}"
-          oras push ghcr.io/${{ github.repository }}:${{ env.SIGNING_KEY_TAG }} \
+          echo "Pushing signing keys to ghcr.io/${{ github.repository }}:signing-keys"
+          oras push ghcr.io/${{ github.repository }}:signing-keys \
             "${{ env.SIGNING_KEY_PATH }}:application/octet-stream" \
-            "${{ env.SIGNING_KEY_PATH }}.pub:application/octet-stream"
+            "${{ env.SIGNING_KEY_PATH }}.pub:application/octet-stream" \
+            --annotation "org.opencontainers.image.description=Melange signing keys for ironic packages"
 
   build-packages:
     name: Build APK Packages
@@ -193,7 +192,7 @@ jobs:
     runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-22.04' }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           egress-policy: audit
 
@@ -228,14 +227,14 @@ jobs:
       - name: Pull signing keys from registry
         run: |
           # Pull signing keys from registry
-          oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:${{ env.SIGNING_KEY_TAG }} --output ${{ github.workspace }}/
+          oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:signing-keys --output ${{ github.workspace }}/
 
       - name: Sync existing packages from registry
         run: |
           mkdir -p packages/${{ matrix.distro.name }}/${{ matrix.arch }}
 
           # Try to pull existing packages for this distro/arch combination
-          if oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:${{ env.TAG }} --output ${{ github.workspace }}/ 2>/dev/null; then
+          if oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:${{ matrix.distro.name }}-${{ matrix.arch }} --output ${{ github.workspace }}/ 2>/dev/null; then
             echo "Synced existing packages from registry for ${{ matrix.distro.name }}-${{ matrix.arch }}"
           else
             echo "No existing packages found in registry for ${{ matrix.distro.name }}-${{ matrix.arch }}, starting fresh"
@@ -294,7 +293,7 @@ jobs:
           # Only push if we have files to push
           if [[ ${#push_args[@]} -gt 0 ]]; then
             echo "Pushing ${#push_args[@]} files to registry for ${{ matrix.distro.name }}-${{ matrix.arch }}"
-            oras push "ghcr.io/${{ github.repository }}:${{ env.TAG }}" "${push_args[@]}"
+            oras push "ghcr.io/${{ github.repository }}:${{ matrix.distro.name }}-${{ matrix.arch }}" "${push_args[@]}"
           else
             echo "No packages to push for ${{ matrix.distro.name }}-${{ matrix.arch }}"
           fi
@@ -313,7 +312,7 @@ jobs:
       (needs.detect-changes.outputs.packages != '[]')
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           egress-policy: audit
 
@@ -330,18 +329,25 @@ jobs:
       - name: Pull signing keys from registry
         run: |
           # Pull signing keys from registry
-          oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:${{ env.TAG }} --output ${{ github.workspace }}/
+          oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:signing-keys --output ${{ github.workspace }}/
 
       - name: Pull all packages from registry
         run: |
           mkdir -p packages
+
           # Pull packages for each distro/arch combination
-          if oras pull --allow-path-traversal "ghcr.io/${{ github.repository }}:${{ env.TAG }}" --output ${{ github.workspace }}/ 2>/dev/null; then
-            echo "Successfully pulled packages"
-          else
-            echo "Error pulling packages from registry"
-            exit 1
-          fi
+          for distro in alpine wolfi; do
+            for arch in x86_64 aarch64; do
+              echo "Pulling packages for ${distro}-${arch}..."
+              mkdir -p "packages/${distro}/${arch}"
+
+              if oras pull --allow-path-traversal "ghcr.io/${{ github.repository }}:latest" --output "${{ github.workspace }}/" 2>/dev/null; then
+                echo "Successfully pulled packages for ${distro}-${arch}"
+              else
+                echo "No packages found for ${distro}-${arch}, skipping"
+              fi
+            done
+          done
 
       - name: Setup Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
