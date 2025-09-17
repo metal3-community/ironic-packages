@@ -341,7 +341,7 @@ jobs:
               echo "Pulling packages for ${distro}-${arch}..."
               mkdir -p "packages/${distro}/${arch}"
 
-              if oras pull --allow-path-traversal "ghcr.io/${{ github.repository }}:${{ matrix.distro.name }}-${{ matrix.arch }}" --output "${{ github.workspace }}/" 2>/dev/null; then
+              if oras pull --allow-path-traversal "ghcr.io/${{ github.repository }}:${distro}-${arch}" --output "${{ github.workspace }}/" 2>/dev/null; then
                 echo "Successfully pulled packages for ${distro}-${arch}"
               else
                 echo "No packages found for ${distro}-${arch}, skipping"
