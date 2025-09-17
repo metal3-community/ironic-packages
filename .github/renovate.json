@@ -6,7 +6,7 @@
     ":dependencyDashboard"
   ],
   "schedule": [
-    "after 6am and before 6pm on weekdays"
+    "after 6am and before 6pm every weekday"
   ],
   "timezone": "UTC",
   "labels": ["dependencies", "automated"],
@@ -17,6 +17,28 @@
     "enabled": true
   },
   "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update PyPI packages with explicit vars.import setting",
+      "fileMatch": ["^py3-.*\\.yaml$"],
+      "matchStrings": [
+        "(?s)package:[\\s\\S]*?version:\\s*[\"']?(?<currentValue>[^\"'\\s\\n]+)[\"']?[\\s\\S]*?vars:[\\s\\S]*?import:\\s*(?<depName>[^\\s\\n]+)"
+      ],
+      "datasourceTemplate": "pypi",
+      "depNameTemplate": "{{depName}}",
+      "packageNameTemplate": "{{depName}}"
+    },
+    {
+      "customType": "regex",
+      "description": "Update PyPI packages without explicit vars.import (use derived name)",
+      "fileMatch": ["^py3-.*\\.yaml$"],
+      "matchStrings": [
+        "(?s)package:[\\s\\S]*?name:\\s*py3-(?<packageName>[^\\s\\n]+)[\\s\\S]*?version:\\s*[\"']?(?<currentValue>[^\"'\\s\\n]+)[\"']?"
+      ],
+      "datasourceTemplate": "pypi",
+      "depNameTemplate": "{{packageName}}",
+      "packageNameTemplate": "{{packageName}}"
+    },
     {
       "customType": "regex",
       "description": "Update Melange package version and git commit for OpenDev repositories",
@@ -32,24 +54,13 @@
     },
     {
       "customType": "regex",
-      "description": "Update Melange package version and git commit for GitHub repositories",  
+      "description": "Update Melange package version and git commit for GitHub repositories",
       "fileMatch": ["^py3-.*\\.yaml$"],
       "matchStrings": [
         "(?s)package:[\\s\\S]*?version:\\s*[\"']?(?<currentValue>[^\"'\\s\\n]+)[\"']?[\\s\\S]*?repository:\\s*https://github\\.com/(?<depName>[^/\\s]+/[^/\\s]+)[\\s\\S]*?expected-commit:\\s*(?<currentDigest>[a-f0-9]{40})"
       ],
       "datasourceTemplate": "github-tags",
       "versioningTemplate": "semver",
-      "depNameTemplate": "{{depName}}",
-      "packageNameTemplate": "py3-{{depName}}"
-    },
-    {
-      "customType": "regex",
-      "description": "Update Melange package version for PyPI packages",
-      "fileMatch": ["^py3-.*\\.yaml$"],
-      "matchStrings": [
-        "version:\\s*[\"']?(?<currentValue>[^\"'\\s\\n]+)[\"']?[\\s\\S]*?pypi-package:\\s*(?<depName>\\S+)"
-      ],
-      "datasourceTemplate": "pypi",
       "depNameTemplate": "{{depName}}",
       "packageNameTemplate": "py3-{{depName}}"
     }
@@ -95,10 +106,5 @@
       "separateMinorPatch": false,
       "separateMajorMinor": false
     }
-  ],
-  "git": {
-    "ignoredAuthors": ["renovate[bot]@users.noreply.github.com"]
-  },
-  "onboarding": false,
-  "requireConfig": "optional"
+  ]
 }
