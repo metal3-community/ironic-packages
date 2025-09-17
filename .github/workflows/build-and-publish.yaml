@@ -49,6 +49,9 @@ jobs:
   detect-changes:
     name: Detect Package Changes
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     if: |
       github.repository == '${{ github.repository }}' &&
       (github.event_name == 'push' ||
@@ -145,14 +148,24 @@ jobs:
 
       - name: SignIn ORAS
         run: |
+          echo "Logging in to ghcr.io as ${{ github.actor }}"
           oras login ghcr.io -u ${{ github.actor }} -p "${{ secrets.GITHUB_TOKEN }}"
+
+          # Test authentication by trying to pull a public image
+          echo "Testing authentication..."
+          oras version
 
       - name: Push signing keys to registry
         run: |
+          # Debug: Check if signing keys exist
+          ls -la "${{ env.SIGNING_KEY_PATH }}"*
+
           # Push both private and public signing keys to registry
+          echo "Pushing signing keys to ghcr.io/${{ github.repository }}:signing-keys"
           oras push ghcr.io/${{ github.repository }}:signing-keys \
             "${{ env.SIGNING_KEY_PATH }}:application/octet-stream" \
-            "${{ env.SIGNING_KEY_PATH }}.pub:application/octet-stream"
+            "${{ env.SIGNING_KEY_PATH }}.pub:application/octet-stream" \
+            --annotation "org.opencontainers.image.description=Melange signing keys for ironic packages"
 
   build-packages:
     name: Build APK Packages
