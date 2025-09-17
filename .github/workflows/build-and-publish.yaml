@@ -165,8 +165,7 @@ jobs:
           echo "Pushing signing keys to ghcr.io/${{ github.repository }}:${{ env.TAG }}"
           oras push ghcr.io/${{ github.repository }}:${{ env.TAG }} \
             "${{ env.SIGNING_KEY_PATH }}:application/octet-stream" \
-            "${{ env.SIGNING_KEY_PATH }}.pub:application/octet-stream" \
-            --annotation "org.opencontainers.image.description=Melange signing keys for ironic packages"
+            "${{ env.SIGNING_KEY_PATH }}.pub:application/octet-stream"
 
   build-packages:
     name: Build APK Packages
@@ -335,25 +334,19 @@ jobs:
       - name: Pull all packages from registry
         run: |
           mkdir -p packages
-
           # Pull packages for each distro/arch combination
-          for distro in alpine wolfi; do
-            for arch in x86_64 aarch64; do
-              echo "Pulling packages for ${distro}-${arch}..."
-              mkdir -p "packages/${distro}/${arch}"
-
-              if oras pull --allow-path-traversal "ghcr.io/${{ github.repository }}:${{ env.TAG }}" --output ${{ github.workspace }}/ 2>/dev/null; then
-                echo "Successfully pulled packages for ${distro}-${arch}"
-              else
-                echo "No packages found for ${distro}-${arch}, skipping"
-              fi
-            done
-          done
+          if oras pull --allow-path-traversal "ghcr.io/${{ github.repository }}:${{ env.TAG }}" --output ${{ github.workspace }}/ 2>/dev/null; then
+            echo "Successfully pulled packages"
+          else
+            echo "Error pulling packages from registry"
+            exit 1
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
 
       - name: Move signing keys
+        continue-on-error: true
         run: |
           mv ${{ env.SIGNING_KEY_PATH }} ./packages/
           mv ${{ env.SIGNING_KEY_PATH }}.pub ./packages/
