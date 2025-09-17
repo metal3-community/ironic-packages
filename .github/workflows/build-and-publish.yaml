@@ -38,6 +38,7 @@ permissions:
 env:
   MELANGE_VERSION: 0.30.6
   SIGNING_KEY_PATH: melange.rsa
+  SIGNING_KEY_TAG: signing-keys
   TAG: latest
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
@@ -162,8 +163,8 @@ jobs:
           ls -la "${{ env.SIGNING_KEY_PATH }}"*
 
           # Push both private and public signing keys to registry
-          echo "Pushing signing keys to ghcr.io/${{ github.repository }}:${{ env.TAG }}"
-          oras push ghcr.io/${{ github.repository }}:${{ env.TAG }} \
+          echo "Pushing signing keys to ghcr.io/${{ github.repository }}:${{ env.SIGNING_KEY_TAG }}"
+          oras push ghcr.io/${{ github.repository }}:${{ env.SIGNING_KEY_TAG }} \
             "${{ env.SIGNING_KEY_PATH }}:application/octet-stream" \
             "${{ env.SIGNING_KEY_PATH }}.pub:application/octet-stream"
 
@@ -227,7 +228,7 @@ jobs:
       - name: Pull signing keys from registry
         run: |
           # Pull signing keys from registry
-          oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:${{ env.TAG }} --output ${{ github.workspace }}/
+          oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:${{ env.SIGNING_KEY_TAG }} --output ${{ github.workspace }}/
 
       - name: Sync existing packages from registry
         run: |
