@@ -232,14 +232,14 @@ jobs:
       - name: Pull signing keys from registry
         run: |
           # Pull signing keys from registry
-          oras pull ghcr.io/${{ github.repository }}:signing-keys --output ${{ github.workspace }}/
+          oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:signing-keys --output ${{ github.workspace }}/
 
       - name: Sync existing packages from registry
         run: |
           mkdir -p packages/${{ matrix.distro.name }}/${{ matrix.arch }}
 
           # Try to pull existing packages for this distro/arch combination
-          if oras pull ghcr.io/${{ github.repository }}:${{ matrix.distro.name }}-${{ matrix.arch }} --output packages/ 2>/dev/null; then
+          if oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:${{ matrix.distro.name }}-${{ matrix.arch }} --output packages/ 2>/dev/null; then
             echo "Synced existing packages from registry for ${{ matrix.distro.name }}-${{ matrix.arch }}"
           else
             echo "No existing packages found in registry for ${{ matrix.distro.name }}-${{ matrix.arch }}, starting fresh"
@@ -339,7 +339,7 @@ jobs:
       - name: Pull signing keys from registry
         run: |
           # Pull signing keys from registry
-          oras pull ghcr.io/${{ github.repository }}:signing-keys --output ${{ github.workspace }}/
+          oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:signing-keys --output ${{ github.workspace }}/
 
       - name: Pull all packages from registry
         run: |
@@ -351,7 +351,7 @@ jobs:
               echo "Pulling packages for ${distro}-${arch}..."
               mkdir -p "packages/${distro}/${arch}"
 
-              if oras pull "ghcr.io/${{ github.repository }}:${distro}-${arch}" --output "packages/" 2>/dev/null; then
+              if oras pull --allow-path-traversal "ghcr.io/${{ github.repository }}:${distro}-${arch}" --output "packages/" 2>/dev/null; then
                 echo "Successfully pulled packages for ${distro}-${arch}"
               else
                 echo "No packages found for ${distro}-${arch}, skipping"
