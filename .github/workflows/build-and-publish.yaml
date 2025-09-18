@@ -440,7 +440,7 @@ jobs:
                   apk update
                   </div>
 
-                  <p>Last updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')</p>
+                  <p>Last updated: `date -u '+%Y-%m-%d %H:%M:%S UTC'`</p>
                   <p>Source: <a href="https://github.com/${{ github.repository }}">github.com/${{ github.repository }}</a></p>
               </div>
           </body>
@@ -508,7 +508,7 @@ jobs:
                       </tbody>
                   </table>
 
-                  <p>Last updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')</p>
+                  <p>Last updated: `date -u '+%Y-%m-%d %H:%M:%S UTC'`</p>
               </div>
           </body>
           </html>
