@@ -337,14 +337,14 @@ jobs:
 
           # Pull packages for each distro/arch combination
           for distro in alpine wolfi; do
-            for arch in x86_64 aarch64; do
-              echo "Pulling packages for ${distro}-${arch}..."
-              mkdir -p "packages/${distro}/${arch}"
+            for target_arch in x86_64 aarch64; do
+              echo "Pulling packages for ${distro}-${target_arch}..."
+              mkdir -p "packages/${distro}/${target_arch}"
 
-              if oras pull --allow-path-traversal "ghcr.io/${{ github.repository }}:${distro}-${arch}" --output "${{ github.workspace }}/" 2>/dev/null; then
-                echo "Successfully pulled packages for ${distro}-${arch}"
+              if oras pull --allow-path-traversal "ghcr.io/${{ github.repository }}:${distro}-${target_arch}" --output "${{ github.workspace }}/" 2>/dev/null; then
+                echo "Successfully pulled packages for ${distro}-${target_arch}"
               else
-                echo "No packages found for ${distro}-${arch}, skipping"
+                echo "No packages found for ${distro}-${target_arch}, skipping"
               fi
             done
           done
@@ -370,8 +370,8 @@ jobs:
 
           # Ensure the directory structure exists even if some combinations are empty
           for distro in alpine wolfi; do
-            for arch in x86_64 aarch64; do
-              mkdir -p "repository/${distro}/${arch}"
+            for target_arch in x86_64 aarch64; do
+              mkdir -p "repository/${distro}/${target_arch}"
             done
           done
 
@@ -413,9 +413,9 @@ jobs:
             echo "          <h3>$(echo $distro | tr '[:lower:]' '[:upper:]')</h3>" >> repository/index.html
             echo "          <div class='arch-list'>" >> repository/index.html
 
-            for arch in x86_64 aarch64; do
-              if [[ -d "repository/${distro}/${arch}" ]] && [[ $(ls -1 repository/${distro}/${arch}/*.apk 2>/dev/null | wc -l) -gt 0 ]]; then
-                echo "            <p><a href='./${distro}/${arch}/'>${arch}</a> - $(ls -1 repository/${distro}/${arch}/*.apk 2>/dev/null | wc -l) packages</p>" >> repository/index.html
+            for target_arch in x86_64 aarch64; do
+              if [[ -d "repository/${distro}/${target_arch}" ]] && [[ $(ls -1 repository/${distro}/${target_arch}/*.apk 2>/dev/null | wc -l) -gt 0 ]]; then
+                echo "            <p><a href='./${distro}/${target_arch}/'>${target_arch}</a> - $(ls -1 repository/${distro}/${target_arch}/*.apk 2>/dev/null | wc -l) packages</p>" >> repository/index.html
               fi
             done
 
@@ -449,15 +449,15 @@ jobs:
 
           # Create directory index files for each distribution/architecture
           for distro in alpine wolfi; do
-            for arch in x86_64 aarch64; do
-              if [[ -d "repository/${distro}/${arch}" ]]; then
-                cat > "repository/${distro}/${arch}/index.html" << EOF
+            for target_arch in x86_64 aarch64; do
+              if [[ -d "repository/${distro}/${target_arch}" ]]; then
+                cat > "repository/${distro}/${target_arch}/index.html" << EOF
           <!DOCTYPE html>
           <html lang="en">
           <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>${distro^} ${arch} - Metal3 Ironic APK Repository</title>
+              <title>${distro^} ${target_arch} - Metal3 Ironic APK Repository</title>
               <style>
                   body { font-family: Arial, sans-serif; margin: 40px; }
                   .container { max-width: 800px; margin: 0 auto; }
@@ -475,7 +475,7 @@ jobs:
                       <a href="../../">← Back to main repository</a>
                   </div>
 
-                  <h1>${distro^} ${arch} Packages</h1>
+                  <h1>${distro^} ${target_arch} Packages</h1>
 
                   <table>
                       <thead>
@@ -488,23 +488,23 @@ jobs:
                       <tbody>
           EOF
 
-                if [[ -f "repository/${distro}/${arch}/APKINDEX.tar.gz" ]]; then
+                if [[ -f "repository/${distro}/${target_arch}/APKINDEX.tar.gz" ]]; then
                   file="APKINDEX.tar.gz"
-                  size=$(stat -f%z "repository/${distro}/${arch}/${file}" 2>/dev/null || stat -c%s "repository/${distro}/${arch}/${file}" 2>/dev/null || echo "0")
-                  mod_time=$(stat -f%Sm "repository/${distro}/${arch}/${file}" 2>/dev/null || stat -c%y "repository/${distro}/${arch}/${file}" 2>/dev/null || echo "unknown")
-                  echo "                          <tr><td><a href='./${file}'>${file}</a></td><td>${size} bytes</td><td>${mod_time}</td></tr>" >> "repository/${distro}/${arch}/index.html"
+                  size=$(stat -f%z "repository/${distro}/${target_arch}/${file}" 2>/dev/null || stat -c%s "repository/${distro}/${target_arch}/${file}" 2>/dev/null || echo "0")
+                  mod_time=$(stat -f%Sm "repository/${distro}/${target_arch}/${file}" 2>/dev/null || stat -c%y "repository/${distro}/${target_arch}/${file}" 2>/dev/null || echo "unknown")
+                  echo "                          <tr><td><a href='./${file}'>${file}</a></td><td>${size} bytes</td><td>${mod_time}</td></tr>" >> "repository/${distro}/${target_arch}/index.html"
                 fi
 
-                for file in repository/${distro}/${arch}/*.apk; do
+                for file in repository/${distro}/${target_arch}/*.apk; do
                   if [[ -f "$file" ]]; then
                     filename=$(basename "$file")
                     size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
                     mod_time=$(stat -f%Sm "$file" 2>/dev/null || stat -c%y "$file" 2>/dev/null || echo "unknown")
-                    echo "                          <tr><td><a href='./${filename}'>${filename}</a></td><td>${size} bytes</td><td>${mod_time}</td></tr>" >> "repository/${distro}/${arch}/index.html"
+                    echo "                          <tr><td><a href='./${filename}'>${filename}</a></td><td>${size} bytes</td><td>${mod_time}</td></tr>" >> "repository/${distro}/${target_arch}/index.html"
                   fi
                 done
 
-                cat >> "repository/${distro}/${arch}/index.html" << 'EOF'
+                cat >> "repository/${distro}/${target_arch}/index.html" << 'EOF'
                       </tbody>
                   </table>
 
