@@ -1,5 +1,4 @@
 name: Build and Publish APK Repository
-
 on:
   push:
     branches:
@@ -28,23 +27,19 @@ on:
         required: false
         default: false
         type: boolean
-
 permissions:
   contents: read
   pages: write
   id-token: write
   packages: write
-
 env:
   MELANGE_VERSION: 0.30.6
   SIGNING_KEY_PATH: melange.rsa
-
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
-
 jobs:
   detect-changes:
     name: Detect Package Changes
@@ -65,10 +60,9 @@ jobs:
     outputs:
       packages: ${{ steps.check-force.outputs.force == 'true' && steps.all-packages.outputs.packages || steps.changes.outputs.packages }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-
       - name: Check force rebuild
         id: check-force
         run: |
@@ -81,13 +75,11 @@ jobs:
           else
             echo "force=false" >> $GITHUB_OUTPUT
           fi
-
       - name: Get all packages
         id: all-packages
         run: |
           packages="$(ls {py3-*,ipmitool}.yaml | jq -R | jq -sc)"
           echo "packages=${packages}" >> $GITHUB_OUTPUT
-
       - name: Detect changed packages
         id: changes
         if: steps.check-force.outputs.force == 'false'
@@ -124,13 +116,11 @@ jobs:
             echo "$joined" | jq -R . | jq -s . > packages.json
             echo "packages=$(cat packages.json)" >> $GITHUB_OUTPUT
           fi
-
       - id: setup-melange-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /usr/local/bin/melange
           key: melange-cache-x86_64
-
       - name: Install melange
         if: steps.setup-melange-cache.outputs.cache-hit != 'true'
         run: |
@@ -138,14 +128,8 @@ jobs:
           | tar xvz --strip-components=1
           sudo mv melange /usr/local/bin/
           chmod +x /usr/local/bin/melange
-
-      - uses: chainguard-dev/actions/melange-keygen@0cda751b114eb55c388e88f7479292668165602a # v1.0.2
-        with:
-          signing-key-path: ${{ env.SIGNING_KEY_PATH }}
-
       - name: Setup ORAS CLI
-        uses: oras-project/setup-oras@v1
-
+        uses: oras-project/setup-oras@1d808f7d7f6995cc68b7bf507bfe5c5446e1dc9d # v2.0.1
       - name: SignIn ORAS
         run: |
           echo "Logging in to ghcr.io as ${{ github.actor }}"
@@ -154,8 +138,27 @@ jobs:
           # Test authentication by trying to pull a public image
           echo "Testing authentication..."
           oras version
-
+      # Reuse the existing signing key so previously published packages and
+      # indexes stay verifiable. Regenerating the key on every run (the old
+      # behavior) broke signature verification for everything that was not
+      # re-signed in the very latest run.
+      - name: Fetch existing signing keys
+        id: fetch-keys
+        run: |
+          if oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:signing-keys --output . \
+            && [[ -f "${{ env.SIGNING_KEY_PATH }}" && -f "${{ env.SIGNING_KEY_PATH }}.pub" ]]; then
+            echo "Found existing signing keys in registry, reusing them"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No existing signing keys found, a new keypair will be generated"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: chainguard-dev/actions/melange-keygen@7bd1e94b2a1b7faa891392757de7d89489070c5c # v1.6.32
+        if: steps.fetch-keys.outputs.exists != 'true'
+        with:
+          signing-key-path: ${{ env.SIGNING_KEY_PATH }}
       - name: Push signing keys to registry
+        if: steps.fetch-keys.outputs.exists != 'true'
         run: |
           # Debug: Check if signing keys exist
           ls -la "${{ env.SIGNING_KEY_PATH }}"*
@@ -166,7 +169,6 @@ jobs:
             "${{ env.SIGNING_KEY_PATH }}:application/octet-stream" \
             "${{ env.SIGNING_KEY_PATH }}.pub:application/octet-stream" \
             --annotation "org.opencontainers.image.description=Melange signing keys for ironic packages"
-
   build-packages:
     name: Build APK Packages
     strategy:
@@ -192,24 +194,20 @@ jobs:
     runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-22.04' }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
-
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
       - name: Setup ORAS CLI
-        uses: oras-project/setup-oras@v1
-
+        uses: oras-project/setup-oras@1d808f7d7f6995cc68b7bf507bfe5c5446e1dc9d # v2.0.1
       - id: setup-melange-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /usr/local/bin/melange
           key: melange-cache-${{ matrix.arch }}
-
       - name: Install melange
         if: steps.setup-melange-cache.outputs.cache-hit != 'true'
         env:
@@ -219,16 +217,13 @@ jobs:
           | tar xvz --strip-components=1
           sudo mv melange /usr/local/bin/
           chmod +x /usr/local/bin/melange
-
       - name: SignIn ORAS
         run: |
           oras login ghcr.io -u ${{ github.actor }} -p "${{ secrets.GITHUB_TOKEN }}"
-
       - name: Pull signing keys from registry
         run: |
           # Pull signing keys from registry
           oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:signing-keys --output ${{ github.workspace }}/
-
       - name: Sync existing packages from registry
         run: |
           mkdir -p packages/${{ matrix.distro.name }}/${{ matrix.arch }}
@@ -240,13 +235,11 @@ jobs:
             echo "No existing packages found in registry for ${{ matrix.distro.name }}-${{ matrix.arch }}, starting fresh"
           fi
         continue-on-error: true
-
       - name: Ensure packages directory exists
         run: |
           mkdir -p workspace
           mkdir -p cache
           mkdir -p packages/${{ matrix.distro.name }}/${{ matrix.arch }}
-
       - name: Melange Build
         env:
           KEYRING: ${{ matrix.distro.keyring }}
@@ -274,7 +267,6 @@ jobs:
               ${keyring_args} \
               "$config" || echo "Warning: melange build failed for $config, continuing..."
           done
-
       - name: Push packages to registry
         run: |
           # Build the ORAS push command with all APK files and APKINDEX
@@ -297,7 +289,6 @@ jobs:
           else
             echo "No packages to push for ${{ matrix.distro.name }}-${{ matrix.arch }}"
           fi
-
   publish-repository:
     name: Publish APK Repository to GitHub Pages
     runs-on: ubuntu-latest
@@ -312,25 +303,20 @@ jobs:
       (needs.detect-changes.outputs.packages != '[]')
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
-
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup ORAS CLI
-        uses: oras-project/setup-oras@v1
-
+        uses: oras-project/setup-oras@1d808f7d7f6995cc68b7bf507bfe5c5446e1dc9d # v2.0.1
       - name: SignIn ORAS
         run: |
           oras login ghcr.io -u ${{ github.actor }} -p "${{ secrets.GITHUB_TOKEN }}"
-
       - name: Pull signing keys from registry
         run: |
           # Pull signing keys from registry
           oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:signing-keys --output ${{ github.workspace }}/
-
       - name: Pull all packages from registry
         run: |
           mkdir -p packages
@@ -348,16 +334,13 @@ jobs:
               fi
             done
           done
-
       - name: Setup Pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
-
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - name: Move signing keys
         continue-on-error: true
         run: |
           mv ${{ env.SIGNING_KEY_PATH }} ./packages/
           mv ${{ env.SIGNING_KEY_PATH }}.pub ./packages/
-
       - name: Organize repository structure
         run: |
           mkdir -p repository
@@ -374,7 +357,6 @@ jobs:
               mkdir -p "repository/${distro}/${target_arch}"
             done
           done
-
       - name: Generate repository metadata
         run: |
           # Create index.html for the repository
@@ -516,12 +498,10 @@ jobs:
               fi
             done
           done
-
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: repository/
-
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

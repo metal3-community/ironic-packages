@@ -1,5 +1,4 @@
 name: Sync package versions with OpenStack
-
 on:
   schedule:
     # Run daily at 6 AM UTC
@@ -11,11 +10,9 @@ on:
         required: false
         default: false
         type: boolean
-
 permissions:
   contents: write
   pull-requests: write
-
 jobs:
   sync:
     name: updatecli sync
@@ -23,21 +20,17 @@ jobs:
     if: github.repository == 'metal3-community/ironic-packages'
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
-
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install updatecli
         uses: updatecli/updatecli-action@41b9c8d707830a9daebaeaa84c1b62d60b779564 # v3.6.0
         with:
           version: v0.120.1
-
       - name: Install uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-
       - name: Install prerequisites
         run: |
           python3 -c 'import packaging' 2>/dev/null \
@@ -48,34 +41,27 @@ jobs:
               https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
             sudo chmod +x /usr/local/bin/yq
           }
-
       - name: Read pinned OpenStack series
         id: pin
         run: |
           echo "series=$(yq -r '.openstack.series' updatecli/values.yaml)" >> "$GITHUB_OUTPUT"
-
       - name: Regenerate dependency lock
         if: github.event.inputs.dry_run != 'true'
         run: python3 scripts/ironic-deps.py lock
-
       - name: Sync package set from the dependency lock
         if: github.event.inputs.dry_run != 'true'
         run: python3 scripts/ironic-deps.py sync
-
       - name: updatecli diff
         if: github.event.inputs.dry_run == 'true'
         run: updatecli diff --config updatecli/updatecli.d --values updatecli/values.yaml
-
       - name: updatecli apply
         if: github.event.inputs.dry_run != 'true'
         run: updatecli apply --config updatecli/updatecli.d --values updatecli/values.yaml
-
       - name: Ironic dependency graph report
         run: python3 scripts/ironic-deps.py report >> "$GITHUB_STEP_SUMMARY" || true
-
       - name: Create Pull Request
         if: github.event.inputs.dry_run != 'true'
-        uses: peter-evans/create-pull-request@5e914681df9dc83aa4e4905692ca88beb2f9e91f # v7.0.5
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: sync package versions with OpenStack ${{ steps.pin.outputs.series }}"

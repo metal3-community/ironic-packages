@@ -1,5 +1,4 @@
 name: Wolfictl Lint
-
 on:
   pull_request:
     branches:
@@ -7,11 +6,9 @@ on:
   push:
     branches:
       - 'main'
-    #  - gh-readonly-queue/main/**
-
+      #  - gh-readonly-queue/main/**
 permissions:
   contents: read
-
 jobs:
   lint:
     name: Wolfictl Lint
@@ -21,11 +18,11 @@ jobs:
       contents: read
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # this need to point to main to always get the latest action
-      - uses: wolfi-dev/actions/wolfictl-lint@main # main
+      - uses: wolfi-dev/actions/wolfictl-lint@66b0eb77a4c21eab686f6632185ba7e21ecbb6d5 # dependabot/github_actions/step-security/harden-runner-2.21.0
         with:
           run_wolfictl_lint_yam: false
