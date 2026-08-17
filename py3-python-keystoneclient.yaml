@@ -1,12 +1,13 @@
+# yaml-language-server: $schema=https://github.com/chainguard-dev/melange/raw/refs/heads/main/pkg/config/schema.json
 package:
   name: py3-python-keystoneclient
   description: Client Library for OpenStack Identity
-  version: 5.6.0
+  version: 5.7.0
   epoch: 1
   copyright:
     - license: Apache-2.0
   dependencies:
-    provider-priority: 0
+    provider-priority: "0"
     runtime:
       - py3-debtcollector
       - py3-keystoneauth1
@@ -18,6 +19,8 @@ package:
       - py3-pbr
       - py3-requests
       - py3-stevedore
+  checks: {}
+  cpe: {}
 
 var-transforms:
   - from: ${{package.name}}
@@ -48,6 +51,7 @@ pipeline:
       pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.import}}-${{package.version}}-py3-none-any.whl
 
 test:
+  environment: {}
   pipeline:
     - uses: python/import
       with:
@@ -56,3 +60,5 @@ test:
 
 update:
   enabled: true
+
+capabilities: {}

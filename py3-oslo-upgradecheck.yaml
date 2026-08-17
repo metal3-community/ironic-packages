@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://github.com/chainguard-dev/melange/raw/refs/heads/main/pkg/config/schema.json
 package:
   name: py3-oslo-upgradecheck
   description: Common code for writing OpenStack upgrade checks
@@ -6,13 +7,15 @@ package:
   copyright:
     - license: Apache-2.0
   dependencies:
-    provider-priority: 0
+    provider-priority: "0"
     runtime:
       - py3-oslo-config
       - py3-oslo-i18n
       - py3-oslo-policy
       - py3-oslo-utils
       - py3-prettytable
+  checks: {}
+  cpe: {}
 
 var-transforms:
   - from: ${{package.name}}
@@ -47,6 +50,7 @@ pipeline:
       pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.file}}-${{package.version}}-py3-none-any.whl
 
 test:
+  environment: {}
   pipeline:
     - uses: python/import
       with:
@@ -55,3 +59,5 @@ test:
 
 update:
   enabled: true
+
+capabilities: {}

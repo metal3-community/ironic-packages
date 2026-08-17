@@ -1,17 +1,20 @@
+# yaml-language-server: $schema=https://github.com/chainguard-dev/melange/raw/refs/heads/main/pkg/config/schema.json
 package:
   name: py3-ironic-prometheus-exporter
   description: Ironic Prometheus Exporter is a Tool to expose hardware sensor data in the Prometheus format through an HTTP endpoint.
-  version: 4.5.0
+  version: 4.6.0
   epoch: 1
   copyright:
     - license: Apache-2.0
   dependencies:
-    provider-priority: 0
+    provider-priority: "0"
     runtime:
       - py3-flask
       - py3-oslo-messaging
       - py3-prometheus-client
       - py3-stevedore
+  checks: {}
+  cpe: {}
 
 var-transforms:
   - from: ${{package.name}}
@@ -42,6 +45,7 @@ pipeline:
       pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.import}}-${{package.version}}-py3-none-any.whl
 
 test:
+  environment: {}
   pipeline:
     - uses: python/import
       with:
@@ -50,3 +54,5 @@ test:
 
 update:
   enabled: true
+
+capabilities: {}

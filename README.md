@@ -59,14 +59,47 @@ Packages are automatically built using [Melange](https://github.com/chainguard-d
 
 ### Automated Package Updates
 
-The repository includes comprehensive automation for keeping package definitions up to date:
+Package versions are managed with [updatecli](https://www.updatecli.io/) and
+are pinned to a single **OpenStack release series** (set in
+[`updatecli/values.yaml`](updatecli/values.yaml)), so the whole package set
+stays on versions that OpenStack releases and tests together:
 
-- **Scheduled Updates**: GitHub Actions automatically check for new upstream versions twice daily
-- **Renovate Integration**: Renovate bot monitors dependencies and creates update PRs
-- **Auto-Building**: Updated packages are automatically built and published when PRs are merged
-- **Manual Tools**: Scripts available for local testing and manual updates
+- **Services** (`py3-ironic`, `py3-ironic-python-agent`,
+  `py3-ironic-prometheus-exporter`): latest release of each deliverable in the
+  pinned series, from [openstack/releases](https://opendev.org/openstack/releases).
+- **Libraries** (`py3-oslo-*`, `py3-sushy`, etc.): exact pins from the series'
+  [`upper-constraints.txt`](https://releases.openstack.org/constraints/upper/2025.2).
+- **Ironic driver libraries** (`py3-proliantutils`, `py3-python-scciclient`,
+  `py3-sushy-oem-idrac`): newest PyPI release satisfying ironic's
+  `driver-requirements.txt` range at the series' ironic version.
 
-See [`scripts/README.md`](scripts/README.md) for detailed information about the automation system.
+The managed package *set* is itself derived from ironic's dependency graph:
+[`scripts/ironic-deps.py`](scripts/ironic-deps.py) recursively walks PyPI
+`requires_dist` metadata from the packaged services (each node at its
+upper-constraints version) to compute the full transitive closure. Its `sync`
+command regenerates the `dependencies:` list in `updatecli/values.yaml` and
+scaffolds a `py3-<name>.yaml` for any new transitive dependency that is not
+listed in `externalPackages` (the human-curated list of packages provided by
+the upstream Alpine/Wolfi repositories); its `report` command publishes the
+coverage report in the workflow run summary, including local packages that
+have dropped out of the graph.
+
+The [`updatecli.yaml`](.github/workflows/updatecli.yaml) workflow runs daily,
+syncs the package set, applies the version pins, and opens a single PR with
+the coordinated result. Scaffolded packages are starting points — review the
+license and test import before merging.
+
+To move the whole package set to a new OpenStack release, change
+`openstack.series` in `updatecli/values.yaml` (e.g. `"2025.2"` → `"2026.1"`)
+and let the workflow (or a local run) do the rest.
+
+To run the sync locally (requires `updatecli`, `curl`, `yq`, and Python with
+the `packaging` module):
+
+```bash
+updatecli diff --config updatecli/updatecli.d --values updatecli/values.yaml
+updatecli apply --config updatecli/updatecli.d --values updatecli/values.yaml
+```
 
 ### Manual Building
 

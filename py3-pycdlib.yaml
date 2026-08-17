@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://github.com/chainguard-dev/melange/raw/refs/heads/main/pkg/config/schema.json
 package:
   name: py3-pycdlib
   description: Pure python ISO manipulation library
@@ -6,7 +7,9 @@ package:
   copyright:
     - license: LGPL-2.0
   dependencies:
-    provider-priority: 0
+    provider-priority: "0"
+  checks: {}
+  cpe: {}
 
 var-transforms:
   - from: ${{package.name}}
@@ -40,6 +43,7 @@ pipeline:
       pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} .
 
 test:
+  environment: {}
   pipeline:
     - uses: python/import
       with:
@@ -48,3 +52,5 @@ test:
 
 update:
   enabled: true
+
+capabilities: {}

@@ -1,12 +1,13 @@
+# yaml-language-server: $schema=https://github.com/chainguard-dev/melange/raw/refs/heads/main/pkg/config/schema.json
 package:
   name: py3-keystonemiddleware
   description: Middleware for OpenStack Identity
-  version: 10.12.0
+  version: 10.10.0
   epoch: 2
   copyright:
     - license: Apache-2.0
   dependencies:
-    provider-priority: 0
+    provider-priority: "0"
     runtime:
       - py3-cryptography
       - py3-keystoneauth1
@@ -23,6 +24,8 @@ package:
       - py3-python-keystoneclient
       - py3-requests
       - py3-webob
+  checks: {}
+  cpe: {}
 
 var-transforms:
   - from: ${{package.name}}
@@ -53,6 +56,7 @@ pipeline:
       pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.import}}-${{package.version}}-py3-none-any.whl
 
 test:
+  environment: {}
   pipeline:
     - uses: python/import
       with:
@@ -61,3 +65,5 @@ test:
 
 update:
   enabled: true
+
+capabilities: {}

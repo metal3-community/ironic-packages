@@ -1,12 +1,13 @@
+# yaml-language-server: $schema=https://github.com/chainguard-dev/melange/raw/refs/heads/main/pkg/config/schema.json
 package:
   name: py3-python-scciclient
   description: Python ServerView Common Command Interface (SCCI) Client Library
-  version: 0.17.0
+  version: 0.16.0
   epoch: 1
   copyright:
     - license: Apache-2.0
   dependencies:
-    provider-priority: 0
+    provider-priority: "0"
     runtime:
       - py3-babel
       - py3-defusedxml
@@ -18,6 +19,8 @@ package:
       - py3-pyghmi
       - py3-pysnmp
       - py3-requests
+  checks: {}
+  cpe: {}
 
 var-transforms:
   - from: ${{package.name}}
@@ -48,6 +51,7 @@ pipeline:
       pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.import}}-${{package.version}}-py3-none-any.whl
 
 test:
+  environment: {}
   pipeline:
     - uses: python/import
       with:
@@ -56,3 +60,5 @@ test:
 
 update:
   enabled: true
+
+capabilities: {}

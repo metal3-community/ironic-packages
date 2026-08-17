@@ -1,0 +1,104 @@
+name: Sync package versions with OpenStack
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only print the diff, do not open a PR'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: updatecli sync
+    runs-on: ubuntu-latest
+    if: github.repository == 'metal3-community/ironic-packages'
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Install updatecli
+        uses: updatecli/updatecli-action@41b9c8d707830a9daebaeaa84c1b62d60b779564 # v3.6.0
+        with:
+          version: v0.120.1
+
+      - name: Install prerequisites
+        run: |
+          python3 -c 'import packaging' 2>/dev/null \
+            || python3 -m pip install --user packaging \
+            || python3 -m pip install --user --break-system-packages packaging
+          command -v yq >/dev/null || {
+            sudo curl -sSfL -o /usr/local/bin/yq \
+              https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+            sudo chmod +x /usr/local/bin/yq
+          }
+
+      - name: Read pinned OpenStack series
+        id: pin
+        run: |
+          echo "series=$(yq -r '.openstack.series' updatecli/values.yaml)" >> "$GITHUB_OUTPUT"
+
+      - name: Sync package set from ironic's dependency graph
+        if: github.event.inputs.dry_run != 'true'
+        run: python3 scripts/ironic-deps.py sync
+
+      - name: updatecli diff
+        if: github.event.inputs.dry_run == 'true'
+        run: updatecli diff --config updatecli/updatecli.d --values updatecli/values.yaml
+
+      - name: updatecli apply
+        if: github.event.inputs.dry_run != 'true'
+        run: updatecli apply --config updatecli/updatecli.d --values updatecli/values.yaml
+
+      - name: Ironic dependency graph report
+        run: python3 scripts/ironic-deps.py report >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Create Pull Request
+        if: github.event.inputs.dry_run != 'true'
+        uses: peter-evans/create-pull-request@5e914681df9dc83aa4e4905692ca88beb2f9e91f # v7.0.5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: sync package versions with OpenStack ${{ steps.pin.outputs.series }}"
+          title: "chore: sync package versions with OpenStack ${{ steps.pin.outputs.series }}"
+          body: |
+            ## Coordinated package version sync
+
+            Updates all package definitions to the versions OpenStack releases
+            and tests together for the **${{ steps.pin.outputs.series }}** series
+            (pinned in `updatecli/values.yaml`):
+
+            - **Services** (`ironic`, `ironic-python-agent`, `ironic-prometheus-exporter`):
+              latest release of each deliverable in the series, from
+              [openstack/releases](https://opendev.org/openstack/releases).
+            - **Libraries**: exact pins from the series'
+              [upper-constraints.txt](https://releases.openstack.org/constraints/upper/${{ steps.pin.outputs.series }}).
+            - **Ironic driver libraries** (`proliantutils`, `python-scciclient`,
+              `sushy-oem-idrac`): newest PyPI release satisfying ironic's
+              `driver-requirements.txt` range at the series' ironic version.
+
+            The managed package *set* is also derived from ironic's recursive
+            dependency graph (PyPI `requires_dist` closure): new transitive
+            dependencies get a scaffolded `py3-<name>.yaml` (review before
+            merging), and packages that leave the graph are dropped from the
+            sync list. See the workflow run summary for the full coverage report.
+
+            ---
+            *This PR was created automatically by the updatecli workflow.*
+          branch: update/openstack-${{ steps.pin.outputs.series }}
+          delete-branch: true
+          labels: |
+            automated
+            package-update

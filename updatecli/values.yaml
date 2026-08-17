@@ -1,0 +1,175 @@
+openstack:
+  # The single pin everything else derives from: the OpenStack
+  # coordinated-release series to track (release-id from
+  # https://releases.openstack.org). Ironic and every dependency are kept on
+  # the versions OpenStack releases/tests together for this series:
+  #
+  #   services:        latest release of the deliverable in this series
+  #                    (openstack/releases deliverables/<series>/<name>.yaml)
+  #   dependencies:    exact pins from the series' upper-constraints.txt
+  #                    (https://releases.openstack.org/constraints/upper/<series>)
+  #   driverLibraries: not in upper-constraints; newest PyPI release that
+  #                    satisfies ironic's own driver-requirements.txt range
+  #                    at this series' ironic version
+  #
+  # Bump this value (e.g. to "2026.1") to move the whole package set to a new
+  # OpenStack release in one coordinated update.
+  series: "2025.2"
+
+  # OpenStack services/deliverables packaged here (py3-<name>.yaml).
+  services:
+    - ironic
+    - ironic-python-agent
+    - ironic-prometheus-exporter
+
+  # Libraries pinned by the series' upper-constraints.txt (py3-<name>.yaml).
+  # GENERATED — do not edit by hand: 'scripts/ironic-deps.py sync' regenerates
+  # this list from the recursive dependency graph (requires_dist closure) of
+  # the services above, minus externalPackages and driverLibraries.
+  dependencies:
+    - amqp
+    - automaton
+    - babel
+    - construct
+    - cotyledon
+    - debtcollector
+    - dogpile-cache
+    - eventlet
+    - futurist
+    - ifaddr
+    - iso8601
+    - keystoneauth1
+    - keystonemiddleware
+    - kombu
+    - microversion-parse
+    - netaddr
+    - openstacksdk
+    - os-service-types
+    - os-traits
+    - oslo-cache
+    - oslo-concurrency
+    - oslo-config
+    - oslo-context
+    - oslo-db
+    - oslo-i18n
+    - oslo-log
+    - oslo-messaging
+    - oslo-metrics
+    - oslo-middleware
+    - oslo-policy
+    - oslo-serialization
+    - oslo-service
+    - oslo-upgradecheck
+    - oslo-utils
+    - oslo-versionedobjects
+    - osprofiler
+    - paste
+    - pastedeploy
+    - pint
+    - pycadf
+    - pycdlib
+    - pyghmi
+    - python-keystoneclient
+    - requestsexceptions
+    - rfc3986
+    - sushy
+    - testresources
+    - testscenarios
+    - tooz
+    - vine
+    - voluptuous
+    - yappi
+    - zeroconf
+
+  # Ironic driver libraries constrained by ironic's driver-requirements.txt
+  # instead of upper-constraints (py3-<name>.yaml, name == PyPI name).
+  driverLibraries:
+    - proliantutils
+    - python-scciclient
+    - sushy-oem-idrac
+
+  # Dependency-graph members provided by the upstream Alpine/Wolfi
+  # repositories (or the distro's python itself) rather than packaged here.
+  # Human-curated: 'scripts/ironic-deps.py sync' treats any NEW graph member
+  # not listed here as a package to scaffold and manage in this repo. To
+  # hand a package over to the upstream distro, add it here and delete its
+  # py3-<name>.yaml.
+  externalPackages:
+    - alembic
+    - ansible
+    - ansible-core
+    - attrs
+    - bcrypt
+    - blinker
+    - cachetools
+    - certifi
+    - cffi
+    - charset-normalizer
+    - cheroot
+    - click
+    - cryptography
+    - decorator
+    - defusedxml
+    - dnspython
+    - fasteners
+    - flask
+    - greenlet
+    - idna
+    - itsdangerous
+    - jaraco-functools
+    - jinja2
+    - jmespath
+    - jsonpatch
+    - jsonpointer
+    - jsonschema
+    - jsonschema-specifications
+    - jwcrypto
+    - legacy-cgi
+    - mako
+    - markupsafe
+    - more-itertools
+    - msgpack
+    - numpy
+    - packaging
+    - pbr
+    - pecan
+    - platformdirs
+    - ply
+    - prettytable
+    - prometheus-client
+    - psutil
+    - pyasn1
+    - pyasn1-modules
+    - pycparser
+    - pyjwt
+    - pyopenssl
+    - pyparsing
+    - pysmi-lextudio
+    - pysnmpcrypto
+    - pysnmp-lextudio
+    - python-dateutil
+    - pyudev
+    - pyyaml
+    - redis
+    - referencing
+    - repoze-lru
+    - requests
+    - resolvelib
+    - retrying
+    - routes
+    - rpds-py
+    - setproctitle
+    - setuptools
+    - six
+    - sqlalchemy
+    - statsd
+    - stevedore
+    - tenacity
+    - typing-extensions
+    - tzdata
+    - urllib3
+    - wcwidth
+    - webob
+    - websockify
+    - werkzeug
+    - wrapt

@@ -1,12 +1,15 @@
+# yaml-language-server: $schema=https://github.com/chainguard-dev/melange/raw/refs/heads/main/pkg/config/schema.json
 package:
   name: py3-pint
   description: Physical quantities module
-  version: 0.25
+  version: "0.23"
   epoch: 1
   copyright:
     - license: BSD-2-Clause
   dependencies:
-    provider-priority: 0
+    provider-priority: "0"
+  checks: {}
+  cpe: {}
 
 var-transforms:
   - from: ${{package.name}}
@@ -37,6 +40,7 @@ pipeline:
       pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.import}}-${{package.version}}-py3-none-any.whl
 
 test:
+  environment: {}
   pipeline:
     - uses: python/import
       with:
@@ -45,3 +49,5 @@ test:
 
 update:
   enabled: true
+
+capabilities: {}

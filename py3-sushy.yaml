@@ -1,17 +1,20 @@
+# yaml-language-server: $schema=https://github.com/chainguard-dev/melange/raw/refs/heads/main/pkg/config/schema.json
 package:
   name: py3-sushy
   description: Sushy is a small Python library to communicate with Redfish based systems
-  version: 5.7.1
+  version: 5.7.2
   epoch: 1
   copyright:
     - license: Apache-2.0
   dependencies:
-    provider-priority: 0
+    provider-priority: "0"
     runtime:
       - py3-pbr
       - py3-dateutil
       - py3-requests
       - py3-stevedore
+  checks: {}
+  cpe: {}
 
 var-transforms:
   - from: ${{package.name}}
@@ -42,6 +45,7 @@ pipeline:
       pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.import}}-${{package.version}}-py3-none-any.whl
 
 test:
+  environment: {}
   pipeline:
     - uses: python/import
       with:
@@ -50,3 +54,5 @@ test:
 
 update:
   enabled: true
+
+capabilities: {}

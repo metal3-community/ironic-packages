@@ -1,12 +1,13 @@
+# yaml-language-server: $schema=https://github.com/chainguard-dev/melange/raw/refs/heads/main/pkg/config/schema.json
 package:
   name: py3-ironic
   description: OpenStack Bare Metal Provisioning
-  version: 32.0.0
+  version: 32.0.1
   epoch: 1
   copyright:
     - license: Apache-2.0
   dependencies:
-    provider-priority: 0
+    provider-priority: "0"
     runtime:
       - py3-alembic
       - py3-automaton
@@ -54,6 +55,8 @@ package:
       - py3-webob
       - py3-zeroconf
       - websockify
+  checks: {}
+  cpe: {}
 
 var-transforms:
   - from: ${{package.name}}
@@ -85,6 +88,7 @@ pipeline:
   - runs: |
 
 test:
+  environment: {}
   pipeline:
     - uses: python/import
       with:
@@ -93,3 +97,5 @@ test:
 
 update:
   enabled: true
+
+capabilities: {}
