@@ -1,17 +1,13 @@
 # yaml-language-server: $schema=https://github.com/chainguard-dev/melange/raw/refs/heads/main/pkg/config/schema.json
 package:
-  name: py3-os-service-types
-  description: Python library for consuming OpenStack sevice-types-authority data
-  version: 1.8.0
-  epoch: 1
+  name: py3-flexparser
+  description: Parsing made fun ... using typing.
+  version: "0.4"
+  epoch: 0
   copyright:
-    - license: Apache-2.0
+    - license: BSD-3-Clause
   dependencies:
-    provider-priority: "0"
-    runtime:
-      - py3-pbr
-  checks: {}
-  cpe: {}
+    provider-priority: 0
 
 var-transforms:
   - from: ${{package.name}}
@@ -25,6 +21,10 @@ var-transforms:
   - from: ${{vars.package}}
     match: "-"
     replace: "_"
+    to: file
+  - from: ${{vars.package}}
+    match: "-"
+    replace: "."
     to: import
 
 environment:
@@ -38,11 +38,10 @@ environment:
 
 pipeline:
   - runs: |
-      wget -T5 --tries=5 https://files.pythonhosted.org/packages/py3/${{vars.prefix}}/${{vars.package}}/${{vars.import}}-${{package.version}}-py3-none-any.whl
-      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.import}}-${{package.version}}-py3-none-any.whl
+      wget -T5 --tries=5 https://files.pythonhosted.org/packages/py3/${{vars.prefix}}/${{vars.package}}/${{vars.file}}-${{package.version}}-py3-none-any.whl
+      pip install --no-deps --no-cache-dir --prefix=/usr --root=${{targets.destdir}} ${{vars.file}}-${{package.version}}-py3-none-any.whl
 
 test:
-  environment: {}
   pipeline:
     - uses: python/import
       with:
@@ -51,5 +50,3 @@ test:
 
 update:
   enabled: true
-
-capabilities: {}

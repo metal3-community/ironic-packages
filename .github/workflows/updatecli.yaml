@@ -35,6 +35,9 @@ jobs:
         with:
           version: v0.120.1
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+
       - name: Install prerequisites
         run: |
           python3 -c 'import packaging' 2>/dev/null \
@@ -51,7 +54,11 @@ jobs:
         run: |
           echo "series=$(yq -r '.openstack.series' updatecli/values.yaml)" >> "$GITHUB_OUTPUT"
 
-      - name: Sync package set from ironic's dependency graph
+      - name: Regenerate dependency lock
+        if: github.event.inputs.dry_run != 'true'
+        run: python3 scripts/ironic-deps.py lock
+
+      - name: Sync package set from the dependency lock
         if: github.event.inputs.dry_run != 'true'
         run: python3 scripts/ironic-deps.py sync
 
@@ -80,20 +87,20 @@ jobs:
             and tests together for the **${{ steps.pin.outputs.series }}** series
             (pinned in `updatecli/values.yaml`):
 
-            - **Services** (`ironic`, `ironic-python-agent`, `ironic-prometheus-exporter`):
-              latest release of each deliverable in the series, from
-              [openstack/releases](https://opendev.org/openstack/releases).
-            - **Libraries**: exact pins from the series'
-              [upper-constraints.txt](https://releases.openstack.org/constraints/upper/${{ steps.pin.outputs.series }}).
-            - **Ironic driver libraries** (`proliantutils`, `python-scciclient`,
-              `sushy-oem-idrac`): newest PyPI release satisfying ironic's
-              `driver-requirements.txt` range at the series' ironic version.
+            1. `pyproject.toml` is regenerated: services at their latest
+               series release (from
+               [openstack/releases](https://opendev.org/openstack/releases))
+               plus ironic's `driver-requirements.txt` ranges.
+            2. `uv pip compile`, constrained by the series'
+               [upper-constraints.txt](https://releases.openstack.org/constraints/upper/${{ steps.pin.outputs.series }}),
+               resolves it into `requirements.lock` — the full transitive
+               dependency set at exact, mutually-compatible versions.
+            3. Every `py3-*.yaml` is synced to its locked version; new locked
+               dependencies get a scaffolded definition (review before
+               merging), and packages that leave the lock are dropped from
+               the sync list.
 
-            The managed package *set* is also derived from ironic's recursive
-            dependency graph (PyPI `requires_dist` closure): new transitive
-            dependencies get a scaffolded `py3-<name>.yaml` (review before
-            merging), and packages that leave the graph are dropped from the
-            sync list. See the workflow run summary for the full coverage report.
+            See the workflow run summary for the full coverage report.
 
             ---
             *This PR was created automatically by the updatecli workflow.*

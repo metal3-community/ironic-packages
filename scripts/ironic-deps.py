@@ -1,33 +1,34 @@
 #!/usr/bin/env python3
-"""Manage this repo's package set from ironic's full dependency graph.
+"""Manage this repo's package set from ironic's fully-resolved dependency lock.
 
-Recursively walks PyPI ``requires_dist`` metadata starting from the services
-packaged here (ironic, ironic-python-agent, ironic-prometheus-exporter, at
-their pinned-series versions) plus ironic's driver-requirements.txt, to
-discover the complete transitive dependency set. Each node is inspected at
-the version pinned by the series' upper-constraints.txt, so the graph matches
-what OpenStack actually tests together; requires_dist is only used to learn
-*which* packages are required, never to choose versions.
+The dependency set and all versions are enumerated by a standard Python
+resolver rather than hand-walked metadata:
 
-Subcommands:
+  1. ``lock`` regenerates pyproject.toml — the packaged services pinned at
+     their versions for the OpenStack series in updatecli/values.yaml (from
+     openstack/releases deliverables) plus ironic's driver-requirements.txt
+     ranges — then resolves it with ``uv pip compile``, constrained by the
+     series' upper-constraints.txt, into requirements.lock. The lock is the
+     single version authority: every transitive dependency at an exact
+     version, proven mutually compatible by the resolver and matching what
+     OpenStack tests together.
 
-  report [series]   Print a markdown report (used in the update PR's workflow
-                    summary): which transitive dependencies are packaged here,
-                    which come from upstream Alpine/Wolfi, and which local
-                    py3-*.yaml files are no longer part of the graph.
+  2. ``sync`` makes the repo match the lock: regenerates the (GENERATED)
+     ``dependencies:`` list in updatecli/values.yaml, and scaffolds a
+     py3-<name>.yaml for any locked package that should be packaged here but
+     has no definition yet. Lock members listed under ``externalPackages`` in
+     values.yaml (human-curated) are left to the upstream distro repos.
 
-  sync [series]     Make the repo match the graph:
-                      - regenerate the (GENERATED) ``dependencies:`` list in
-                        updatecli/values.yaml from the closure, and
-                      - scaffold a py3-<name>.yaml for any closure member that
-                        should be packaged here but has no definition yet.
-                    Closure members listed under ``externalPackages`` in
-                    values.yaml (human-curated) are left to the upstream
-                    distro repos. New closure members without an
-                    upper-constraints pin are warned about, never scaffolded.
+  3. ``report`` prints a markdown coverage report (used in the update PR's
+     workflow summary): which locked packages are packaged here, which come
+     from upstream Alpine/Wolfi, and which local py3-*.yaml files are no
+     longer part of the graph.
 
-Requires: python3 with "packaging", plus scripts/openstack-version.sh
-(curl, yq).
+Usage: ironic-deps.py {lock|sync|report} [series]
+(series defaults to the pin in updatecli/values.yaml)
+
+Requires: python3 with "packaging"; ``lock`` additionally needs uv, curl and
+yq (via scripts/openstack-version.sh).
 """
 
 import argparse
@@ -35,15 +36,17 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 import urllib.request
 from pathlib import Path
 
-from packaging.markers import default_environment
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 VALUES_YAML = REPO_ROOT / "updatecli" / "values.yaml"
+PYPROJECT = REPO_ROOT / "pyproject.toml"
+LOCK_FILE = REPO_ROOT / "requirements.lock"
 VERSION_SH = REPO_ROOT / "scripts" / "openstack-version.sh"
 SERVICES = ["ironic", "ironic-python-agent", "ironic-prometheus-exporter"]
 
@@ -87,6 +90,15 @@ def values_list(key: str) -> list[str]:
     return [canonicalize_name(name) for name in out]
 
 
+def values_scalar(key: str) -> str:
+    return subprocess.run(
+        ["yq", "-r", f".openstack.{key}", str(VALUES_YAML)],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
 def pinned_series() -> str:
     match = re.search(r'^\s*series:\s*"?([0-9.]+)"?\s*$', VALUES_YAML.read_text(), re.M)
     if not match:
@@ -94,92 +106,35 @@ def pinned_series() -> str:
     return match.group(1)
 
 
-def upper_constraints(series: str) -> dict[str, str]:
-    url = f"https://releases.openstack.org/constraints/upper/{series}"
-    with urllib.request.urlopen(url, timeout=60) as resp:
-        text = resp.read().decode()
-    pins = {}
-    for line in text.splitlines():
-        match = re.match(r"^([A-Za-z0-9._-]+)===([^;\s]+)", line.strip())
-        if match:
-            pins.setdefault(canonicalize_name(match.group(1)), match.group(2))
-    return pins
-
-
-def driver_requirement_names(ironic_version: str) -> list[str]:
+def driver_requirements(ironic_version: str) -> list[str]:
+    """Ironic's driver-requirements.txt as normalized requirement strings."""
     url = (
         "https://raw.githubusercontent.com/openstack/ironic/"
         f"{ironic_version}/driver-requirements.txt"
     )
     with urllib.request.urlopen(url, timeout=60) as resp:
         text = resp.read().decode()
-    names = []
+    reqs = []
     for line in text.splitlines():
         line = line.split("#")[0].strip()
         if not line:
             continue
         try:
-            names.append(canonicalize_name(Requirement(line).name))
+            reqs.append(str(Requirement(line)))
         except InvalidRequirement:
             continue
-    return names
+    return reqs
 
 
-def requires_dist(name: str, version: str | None) -> list[str]:
-    url = (
-        f"https://pypi.org/pypi/{name}/{version}/json"
-        if version
-        else f"https://pypi.org/pypi/{name}/json"
-    )
-    data = http_json(url)
-    if data is None and version is not None:
-        data = http_json(f"https://pypi.org/pypi/{name}/json")
-    if data is None:
-        return []
-    return data["info"].get("requires_dist") or []
-
-
-def wanted(req: Requirement, extras: frozenset[str]) -> bool:
-    if req.marker is None:
-        return True
-    env = default_environment()
-    return any(
-        req.marker.evaluate({**env, "extra": extra}) for extra in ({""} | extras)
-    )
-
-
-def walk(seeds: list[tuple[str, str | None, frozenset[str]]], pins: dict[str, str]):
-    """BFS over requires_dist; returns {canonical-name: version-or-None}."""
-    resolved: dict[str, str | None] = {}
-    seen_with_extras: set[tuple[str, frozenset[str]]] = set()
-    queue = list(seeds)
-    while queue:
-        name, version, extras = queue.pop()
-        cname = canonicalize_name(name)
-        if (cname, extras) in seen_with_extras:
-            continue
-        seen_with_extras.add((cname, extras))
-        resolved.setdefault(cname, version)
-        for spec in requires_dist(cname, version):
-            try:
-                req = Requirement(spec)
-            except InvalidRequirement:
-                continue
-            if not wanted(req, extras):
-                continue
-            child = canonicalize_name(req.name)
-            queue.append((child, pins.get(child), frozenset(req.extras)))
-    return resolved
-
-
-def compute_closure(series: str, pins: dict[str, str]):
-    service_versions = {name: resolve("deliverable", series, name) for name in SERVICES}
-    driver_names = driver_requirement_names(service_versions["ironic"])
-    seeds: list[tuple[str, str | None, frozenset[str]]] = [
-        (name, version, frozenset()) for name, version in service_versions.items()
-    ]
-    seeds += [(name, pins.get(name), frozenset()) for name in driver_names]
-    return service_versions, walk(seeds, pins)
+def read_lock() -> dict[str, str]:
+    if not LOCK_FILE.exists():
+        sys.exit("requirements.lock not found — run 'ironic-deps.py lock' first")
+    locked = {}
+    for line in LOCK_FILE.read_text().splitlines():
+        match = re.match(r"^([A-Za-z0-9._-]+)==([^\s;]+)", line.strip())
+        if match:
+            locked[canonicalize_name(match.group(1))] = match.group(2)
+    return locked
 
 
 def local_packages() -> dict[str, Path]:
@@ -187,6 +142,77 @@ def local_packages() -> dict[str, Path]:
         p.name[len("py3-") : -len(".yaml")]: p
         for p in sorted(REPO_ROOT.glob("py3-*.yaml"))
     }
+
+
+# --- lock ---------------------------------------------------------------------
+
+PYPROJECT_TEMPLATE = """\
+# GENERATED — do not edit by hand: 'scripts/ironic-deps.py lock' regenerates
+# this file for the OpenStack series pinned in updatecli/values.yaml
+# (services at their openstack/releases versions, plus ironic's
+# driver-requirements.txt ranges). 'uv pip compile', constrained by the
+# series' upper-constraints.txt, resolves it into requirements.lock — the
+# version authority for every py3-*.yaml package in this repo.
+[project]
+name = "ironic-packages-lock"
+version = "0.0.0"
+description = "Dependency lock meta-project for the ironic-packages APK set (not installable)"
+requires-python = ">={python}"
+dependencies = [
+{dependencies}
+]
+"""
+
+
+def cmd_lock(series: str) -> None:
+    python = values_scalar("lockPython")
+    service_versions = {
+        name: resolve("deliverable", series, name) for name in SERVICES
+    }
+    deps = [f"{name}=={version}" for name, version in service_versions.items()]
+    deps += driver_requirements(service_versions["ironic"])
+
+    PYPROJECT.write_text(
+        PYPROJECT_TEMPLATE.format(
+            python=python,
+            dependencies="\n".join(f'  "{dep}",' for dep in deps),
+        )
+    )
+    print(
+        f"pyproject.toml: {len(deps)} root requirements "
+        f"(ironic {service_versions['ironic']})"
+    )
+
+    constraints_url = f"https://releases.openstack.org/constraints/upper/{series}"
+    with urllib.request.urlopen(constraints_url, timeout=60) as resp:
+        constraints = resp.read()
+    with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tmp:
+        tmp.write(constraints)
+        constraints_file = tmp.name
+    try:
+        subprocess.run(
+            [
+                "uv",
+                "pip",
+                "compile",
+                str(PYPROJECT),
+                "--constraint",
+                constraints_file,
+                "--output-file",
+                str(LOCK_FILE),
+                "--python-version",
+                python,
+                "--python-platform",
+                "linux",
+                "--no-header",
+                "--no-annotate",
+            ],
+            check=True,
+            cwd=REPO_ROOT,
+        )
+    finally:
+        Path(constraints_file).unlink(missing_ok=True)
+    print(f"requirements.lock: {len(read_lock())} packages")
 
 
 # --- scaffolding ------------------------------------------------------------
@@ -239,9 +265,7 @@ package:
   copyright:
     - license: {license}
   dependencies:
-    provider-priority: "0"
-  checks: {}
-  cpe: {}
+    provider-priority: 0
 
 var-transforms:
   - from: ${{{{package.name}}}}
@@ -263,7 +287,6 @@ var-transforms:
 
 {pipeline}
 test:
-  environment: {}
   pipeline:
     - uses: python/import
       with:
@@ -272,8 +295,6 @@ test:
 
 update:
   enabled: true
-
-capabilities: {}
 """
 
 
@@ -362,39 +383,27 @@ def rewrite_dependencies(names: list[str]) -> None:
 # --- commands ----------------------------------------------------------------
 
 
-def classify(series: str):
-    pins = upper_constraints(series)
-    service_versions, closure = compute_closure(series, pins)
+def classify():
+    locked = read_lock()
     external = set(values_list("externalPackages"))
     driver_libs = set(values_list("driverLibraries"))
     managed = {
         cname
-        for cname in closure
-        if cname not in external
-        and cname not in driver_libs
-        and cname not in SERVICES
-        and cname in pins
+        for cname in locked
+        if cname not in external and cname not in driver_libs and cname not in SERVICES
     }
-    unmanageable = {
-        cname
-        for cname in closure
-        if cname not in external
-        and cname not in driver_libs
-        and cname not in SERVICES
-        and cname not in pins
-    }
-    return pins, service_versions, closure, managed, unmanageable, external
+    return locked, managed, external
 
 
-def cmd_sync(series: str) -> None:
-    pins, _, closure, managed, unmanageable, external = classify(series)
+def cmd_sync() -> None:
+    locked, managed, external = classify()
     local = local_packages()
 
     created = []
     for cname in sorted(managed - set(local)):
-        notes = scaffold(cname, pins[cname])
+        notes = scaffold(cname, locked[cname])
         created.append(cname)
-        print(f"scaffolded py3-{cname}.yaml ({pins[cname]})")
+        print(f"scaffolded py3-{cname}.yaml ({locked[cname]})")
         for note in notes:
             print(f"  {note}")
 
@@ -404,55 +413,45 @@ def cmd_sync(series: str) -> None:
     for cname in sorted(set(new) - old):
         print(f"dependencies: added {cname}")
     for cname in sorted(old - set(new)):
-        if cname in external:
-            reason = "moved to externalPackages"
-        elif cname in closure:
-            reason = "no upper-constraints pin"
-        else:
-            reason = "no longer in the dependency graph"
+        reason = (
+            "moved to externalPackages"
+            if cname in external
+            else "no longer in the dependency lock"
+        )
         print(f"dependencies: removed {cname} ({reason})")
 
-    for cname in sorted(unmanageable):
+    for cname in sorted(external - set(locked)):
+        print(f"note: externalPackages entry '{cname}' is no longer in the lock")
+    for name in sorted(set(local) - set(locked) - set(SERVICES)):
         print(
-            f"WARNING: {cname} is in the dependency graph but has no "
-            "upper-constraints pin and is not in externalPackages; "
-            "add it to externalPackages or package it manually"
+            f"note: py3-{name}.yaml is not in the dependency lock (consider removing)"
         )
-    for cname in sorted(external - set(closure)):
-        print(f"note: externalPackages entry '{cname}' is no longer in the graph")
-    orphans = sorted(
-        name
-        for name in local
-        if name not in closure and name not in SERVICES
-    )
-    for name in orphans:
-        print(f"note: py3-{name}.yaml is not in the dependency graph (consider removing)")
     if not created and set(new) == old:
         print("dependency set already in sync")
 
 
 def cmd_report(series: str) -> None:
-    pins, service_versions, closure, _, _, _ = classify(series)
+    locked, _, _ = classify()
     local = local_packages()
 
     packaged, external_rows = [], []
-    for cname in sorted(closure):
-        version = closure[cname] or "unpinned (not in upper-constraints)"
+    for cname in sorted(locked):
         if cname in local:
-            packaged.append(f"- ✅ `{cname}` {version} → `py3-{cname}.yaml`")
+            packaged.append(f"- ✅ `{cname}` {locked[cname]} → `py3-{cname}.yaml`")
         else:
-            external_rows.append(f"- ⬜ `{cname}` {version}")
-    unused = sorted(name for name in local if name not in closure)
+            external_rows.append(f"- ⬜ `{cname}` {locked[cname]}")
+    unused = sorted(set(local) - set(locked))
 
     print(
-        f"### Ironic {service_versions['ironic']} (OpenStack {series}) "
-        "dependency graph coverage"
+        f"### Ironic {locked.get('ironic', '?')} (OpenStack {series}) "
+        "dependency lock coverage"
     )
     print()
     print(
-        f"Transitive closure of `requires_dist` for {', '.join(SERVICES)} and "
-        "ironic's driver-requirements.txt, at upper-constraints versions: "
-        f"**{len(closure)} packages**."
+        "Full dependency set resolved by uv from pyproject.toml "
+        f"({', '.join(SERVICES)} plus ironic's driver-requirements.txt), "
+        "constrained by the series' upper-constraints.txt: "
+        f"**{len(locked)} packages** in requirements.lock."
     )
     print()
     print(f"#### Packaged in this repo ({len(packaged)})")
@@ -464,7 +463,7 @@ def cmd_report(series: str) -> None:
     print("\n".join(external_rows))
     print()
     if unused:
-        print(f"#### ⚠️ Local packages not in the dependency graph ({len(unused)})")
+        print(f"#### ⚠️ Local packages not in the dependency lock ({len(unused)})")
         print()
         print("These py3-*.yaml files are not reachable from ironic's requirements")
         print("and may no longer be needed:")
@@ -475,14 +474,16 @@ def cmd_report(series: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["report", "sync"])
+    parser.add_argument("command", choices=["lock", "sync", "report"])
     parser.add_argument("series", nargs="?", default=None)
     args = parser.parse_args()
     series = args.series or pinned_series()
-    if args.command == "report":
-        cmd_report(series)
+    if args.command == "lock":
+        cmd_lock(series)
+    elif args.command == "sync":
+        cmd_sync()
     else:
-        cmd_sync(series)
+        cmd_report(series)
 
 
 if __name__ == "__main__":

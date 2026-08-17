@@ -29,3 +29,6 @@ hack/
 /x86_64
 /aarch64
 /hack
+
+__pycache__/
+*.pyc

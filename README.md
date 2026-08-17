@@ -59,45 +59,46 @@ Packages are automatically built using [Melange](https://github.com/chainguard-d
 
 ### Automated Package Updates
 
-Package versions are managed with [updatecli](https://www.updatecli.io/) and
-are pinned to a single **OpenStack release series** (set in
-[`updatecli/values.yaml`](updatecli/values.yaml)), so the whole package set
-stays on versions that OpenStack releases and tests together:
+All package versions derive from a single pin — the **OpenStack release
+series** in [`updatecli/values.yaml`](updatecli/values.yaml) — through a
+fully-resolved dependency lock:
 
-- **Services** (`py3-ironic`, `py3-ironic-python-agent`,
-  `py3-ironic-prometheus-exporter`): latest release of each deliverable in the
-  pinned series, from [openstack/releases](https://opendev.org/openstack/releases).
-- **Libraries** (`py3-oslo-*`, `py3-sushy`, etc.): exact pins from the series'
-  [`upper-constraints.txt`](https://releases.openstack.org/constraints/upper/2025.2).
-- **Ironic driver libraries** (`py3-proliantutils`, `py3-python-scciclient`,
-  `py3-sushy-oem-idrac`): newest PyPI release satisfying ironic's
-  `driver-requirements.txt` range at the series' ironic version.
+1. [`scripts/ironic-deps.py`](scripts/ironic-deps.py) `lock` regenerates
+   [`pyproject.toml`](pyproject.toml): the packaged services pinned at their
+   latest release for the series (from
+   [openstack/releases](https://opendev.org/openstack/releases)) plus
+   ironic's `driver-requirements.txt` ranges. `uv pip compile`, constrained
+   by the series'
+   [`upper-constraints.txt`](https://releases.openstack.org/constraints/upper/2025.2),
+   resolves it into [`requirements.lock`](requirements.lock) — the complete
+   transitive dependency set at exact versions, proven mutually compatible
+   by a real resolver and matching what OpenStack tests together.
+1. `ironic-deps.py sync` makes the repo match the lock: it regenerates the
+   `dependencies:` list in `updatecli/values.yaml` and scaffolds a
+   `py3-<name>.yaml` for any locked package not listed in `externalPackages`
+   (the human-curated list of packages provided by the upstream Alpine/Wolfi
+   repositories).
+1. [updatecli](https://www.updatecli.io/) syncs every `py3-*.yaml` to its
+   version in the committed lock (offline — no network at apply time).
 
-The managed package *set* is itself derived from ironic's dependency graph:
-[`scripts/ironic-deps.py`](scripts/ironic-deps.py) recursively walks PyPI
-`requires_dist` metadata from the packaged services (each node at its
-upper-constraints version) to compute the full transitive closure. Its `sync`
-command regenerates the `dependencies:` list in `updatecli/values.yaml` and
-scaffolds a `py3-<name>.yaml` for any new transitive dependency that is not
-listed in `externalPackages` (the human-curated list of packages provided by
-the upstream Alpine/Wolfi repositories); its `report` command publishes the
-coverage report in the workflow run summary, including local packages that
-have dropped out of the graph.
-
-The [`updatecli.yaml`](.github/workflows/updatecli.yaml) workflow runs daily,
-syncs the package set, applies the version pins, and opens a single PR with
-the coordinated result. Scaffolded packages are starting points — review the
-license and test import before merging.
+The [`updatecli.yaml`](.github/workflows/updatecli.yaml) workflow runs daily
+and opens a single PR with the coordinated result, including the
+`pyproject.toml`/`requirements.lock` diff for review; `ironic-deps.py report`
+publishes a coverage report in the run summary. Scaffolded packages are
+starting points — review the license and test import before merging.
 
 To move the whole package set to a new OpenStack release, change
 `openstack.series` in `updatecli/values.yaml` (e.g. `"2025.2"` → `"2026.1"`)
-and let the workflow (or a local run) do the rest.
+and let the workflow (or a local run) do the rest. `openstack.lockPython`
+should track the Python version shipped by the target images, since
+environment markers can change the resolved set.
 
-To run the sync locally (requires `updatecli`, `curl`, `yq`, and Python with
-the `packaging` module):
+To run the full flow locally (requires `uv`, `updatecli`, `curl`, `yq`, and
+Python with the `packaging` module):
 
 ```bash
-updatecli diff --config updatecli/updatecli.d --values updatecli/values.yaml
+python3 scripts/ironic-deps.py lock
+python3 scripts/ironic-deps.py sync
 updatecli apply --config updatecli/updatecli.d --values updatecli/values.yaml
 ```
 

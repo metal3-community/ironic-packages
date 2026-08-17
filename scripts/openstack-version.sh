@@ -6,16 +6,20 @@
 # updatecli manifests in updatecli/updatecli.d/.
 #
 # Subcommands:
+#   lock        <name>                exact pin from the committed requirements.lock
+#                                     (offline; the version source used by updatecli)
 #   series-name <series>              release-id -> deliverables dir (2025.2 -> flamingo)
 #   deliverable <series> <name>       latest release of an OpenStack deliverable in the series
 #   constraint  <series> <name>       exact pin from the series' upper-constraints.txt
 #   driver-lib  <series> <pypi-name>  newest PyPI release satisfying ironic's
 #                                     driver-requirements.txt range at the series' ironic version
 #
-# Requires: bash, curl, yq (mikefarah v4), python3 with the "packaging" module
-# (driver-lib only).
+# Requires: bash; curl + yq (mikefarah v4) for the network subcommands;
+# python3 with the "packaging" module for driver-lib.
 
 set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 RELEASES_RAW="https://raw.githubusercontent.com/openstack/releases/master"
 IRONIC_RAW="https://raw.githubusercontent.com/openstack/ironic"
@@ -56,6 +60,15 @@ deliverable() { # <series> <name>
   f=$(fetch_cached "$RELEASES_RAW/deliverables/$dir/$2.yaml" "deliverable-$dir-$2.yaml")
   v=$(yq -r '.releases[-1].version' "$f")
   [ -n "$v" ] && [ "$v" != "null" ] || die "no releases for $2 in series $1 ($dir)"
+  printf '%s\n' "$v"
+}
+
+lock() { # <name>
+  local f="$REPO_ROOT/requirements.lock" v
+  [ -s "$f" ] || die "requirements.lock not found — run 'scripts/ironic-deps.py lock' first"
+  v=$(grep -iE "^$(name_pattern "$1")==" "$f" | head -n1 \
+    | sed -E 's/^[^=]*==//; s/[;[:space:]].*$//')
+  [ -n "$v" ] || die "$1 not found in requirements.lock"
   printf '%s\n' "$v"
 }
 
@@ -109,9 +122,10 @@ PY
 cmd="${1:-}"
 shift || true
 case "$cmd" in
+  lock)        [ $# -eq 1 ] || die "usage: lock <name>"; lock "$1" ;;
   series-name) [ $# -eq 1 ] || die "usage: series-name <series>"; series_name "$1" ;;
   deliverable) [ $# -eq 2 ] || die "usage: deliverable <series> <name>"; deliverable "$@" ;;
   constraint)  [ $# -eq 2 ] || die "usage: constraint <series> <name>"; constraint "$@" ;;
   driver-lib)  [ $# -eq 2 ] || die "usage: driver-lib <series> <pypi-name>"; driver_lib "$@" ;;
-  *) die "usage: openstack-version.sh {series-name|deliverable|constraint|driver-lib} ..." ;;
+  *) die "usage: openstack-version.sh {lock|series-name|deliverable|constraint|driver-lib} ..." ;;
 esac
