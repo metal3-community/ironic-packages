@@ -48,7 +48,6 @@ jobs:
       contents: read
       packages: write
     if: |
-      github.repository == '${{ github.repository }}' &&
       (github.event_name == 'push' ||
        github.event_name == 'workflow_dispatch' ||
        (github.event_name == 'pull_request' && github.event.action != 'closed') ||
@@ -116,59 +115,20 @@ jobs:
             echo "$joined" | jq -R . | jq -s . > packages.json
             echo "packages=$(cat packages.json)" >> $GITHUB_OUTPUT
           fi
-      - id: setup-melange-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: /usr/local/bin/melange
-          key: melange-cache-x86_64
-      - name: Install melange
-        if: steps.setup-melange-cache.outputs.cache-hit != 'true'
+      # The signing key lives ONLY in the MELANGE_SIGNING_KEY repository
+      # secret. It must never be pushed to the registry or the Pages site:
+      # earlier revisions of this workflow published the private key to both
+      # (ghcr :signing-keys artifact and /melange.rsa on Pages), so that key
+      # is compromised and had to be rotated. Fail fast if the secret is
+      # missing so later jobs don't half-publish.
+      - name: Verify signing key secret
+        env:
+          MELANGE_SIGNING_KEY: ${{ secrets.MELANGE_SIGNING_KEY }}
         run: |
-          curl -sL "https://github.com/chainguard-dev/melange/releases/download/v${{ env.MELANGE_VERSION }}/melange_${{ env.MELANGE_VERSION }}_linux_amd64.tar.gz" \
-          | tar xvz --strip-components=1
-          sudo mv melange /usr/local/bin/
-          chmod +x /usr/local/bin/melange
-      - name: Setup ORAS CLI
-        uses: oras-project/setup-oras@1d808f7d7f6995cc68b7bf507bfe5c5446e1dc9d # v2.0.1
-      - name: SignIn ORAS
-        run: |
-          echo "Logging in to ghcr.io as ${{ github.actor }}"
-          oras login ghcr.io -u ${{ github.actor }} -p "${{ secrets.GITHUB_TOKEN }}"
-
-          # Test authentication by trying to pull a public image
-          echo "Testing authentication..."
-          oras version
-      # Reuse the existing signing key so previously published packages and
-      # indexes stay verifiable. Regenerating the key on every run (the old
-      # behavior) broke signature verification for everything that was not
-      # re-signed in the very latest run.
-      - name: Fetch existing signing keys
-        id: fetch-keys
-        run: |
-          if oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:signing-keys --output . \
-            && [[ -f "${{ env.SIGNING_KEY_PATH }}" && -f "${{ env.SIGNING_KEY_PATH }}.pub" ]]; then
-            echo "Found existing signing keys in registry, reusing them"
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "No existing signing keys found, a new keypair will be generated"
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+          if [[ -z "$MELANGE_SIGNING_KEY" ]]; then
+            echo "::error::MELANGE_SIGNING_KEY secret is not set. Generate a keypair with 'melange keygen melange.rsa' and store the private key with: gh secret set MELANGE_SIGNING_KEY < melange.rsa"
+            exit 1
           fi
-      - uses: chainguard-dev/actions/melange-keygen@7bd1e94b2a1b7faa891392757de7d89489070c5c # v1.6.32
-        if: steps.fetch-keys.outputs.exists != 'true'
-        with:
-          signing-key-path: ${{ env.SIGNING_KEY_PATH }}
-      - name: Push signing keys to registry
-        if: steps.fetch-keys.outputs.exists != 'true'
-        run: |
-          # Debug: Check if signing keys exist
-          ls -la "${{ env.SIGNING_KEY_PATH }}"*
-
-          # Push both private and public signing keys to registry
-          echo "Pushing signing keys to ghcr.io/${{ github.repository }}:signing-keys"
-          oras push ghcr.io/${{ github.repository }}:signing-keys \
-            "${{ env.SIGNING_KEY_PATH }}:application/octet-stream" \
-            "${{ env.SIGNING_KEY_PATH }}.pub:application/octet-stream" \
-            --annotation "org.opencontainers.image.description=Melange signing keys for ironic packages"
   build-packages:
     name: Build APK Packages
     strategy:
@@ -188,7 +148,7 @@ jobs:
             keyring: https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
       fail-fast: false
     needs: detect-changes
-    if: github.repository == '${{ github.repository }}' && needs.detect-changes.outputs.packages != '[]'
+    if: needs.detect-changes.outputs.packages != '[]'
     env:
       PACKAGES_TO_BUILD: ${{ needs.detect-changes.outputs.packages }}
     runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-22.04' }}
@@ -220,10 +180,13 @@ jobs:
       - name: SignIn ORAS
         run: |
           oras login ghcr.io -u ${{ github.actor }} -p "${{ secrets.GITHUB_TOKEN }}"
-      - name: Pull signing keys from registry
+      - name: Write signing key from secret
+        env:
+          MELANGE_SIGNING_KEY: ${{ secrets.MELANGE_SIGNING_KEY }}
         run: |
-          # Pull signing keys from registry
-          oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:signing-keys --output ${{ github.workspace }}/
+          printf '%s\n' "$MELANGE_SIGNING_KEY" > "${{ env.SIGNING_KEY_PATH }}"
+          chmod 600 "${{ env.SIGNING_KEY_PATH }}"
+          openssl rsa -in "${{ env.SIGNING_KEY_PATH }}" -pubout -out "${{ env.SIGNING_KEY_PATH }}.pub"
       - name: Sync existing packages from registry
         run: |
           mkdir -p packages/${{ matrix.distro.name }}/${{ matrix.arch }}
@@ -235,6 +198,19 @@ jobs:
             echo "No existing packages found in registry for ${{ matrix.distro.name }}-${{ matrix.arch }}, starting fresh"
           fi
         continue-on-error: true
+      # The synced APKINDEX may be signed by an older (historically rotated
+      # and destroyed) key, which makes melange fail to verify the local
+      # repository and silently broke every build. Regenerate and sign it
+      # with the current key before building.
+      - name: Re-sign local package index
+        run: |
+          dir="packages/${{ matrix.distro.name }}/${{ matrix.arch }}"
+          rm -f "$dir/APKINDEX.tar.gz"
+          if compgen -G "$dir/*.apk" > /dev/null; then
+            (cd "$dir" && melange index \
+              --signing-key "${GITHUB_WORKSPACE}/${{ env.SIGNING_KEY_PATH }}" \
+              -o APKINDEX.tar.gz *.apk)
+          fi
       - name: Ensure packages directory exists
         run: |
           mkdir -p workspace
@@ -265,8 +241,18 @@ jobs:
               --runner docker \
               ${repository_args} \
               ${keyring_args} \
-              "$config" || echo "Warning: melange build failed for $config, continuing..."
+              "$config" || { echo "::error::melange build failed for $config"; echo "$config" >> melange-failures.txt; }
           done
+      # Sign the final index (covering synced + newly built packages) with
+      # the current key before pushing.
+      - name: Sign package index
+        run: |
+          dir="packages/${{ matrix.distro.name }}/${{ matrix.arch }}"
+          if compgen -G "$dir/*.apk" > /dev/null; then
+            (cd "$dir" && melange index \
+              --signing-key "${GITHUB_WORKSPACE}/${{ env.SIGNING_KEY_PATH }}" \
+              -o APKINDEX.tar.gz *.apk)
+          fi
       - name: Push packages to registry
         run: |
           # Build the ORAS push command with all APK files and APKINDEX
@@ -289,12 +275,21 @@ jobs:
           else
             echo "No packages to push for ${{ matrix.distro.name }}-${{ matrix.arch }}"
           fi
+      # Successful packages are pushed above; still fail the job so build
+      # breakage is visible instead of silently republishing stale state.
+      - name: Report build failures
+        run: |
+          if [[ -s melange-failures.txt ]]; then
+            echo "::error::The following packages failed to build:"
+            cat melange-failures.txt
+            exit 1
+          fi
   publish-repository:
     name: Publish APK Repository to GitHub Pages
     runs-on: ubuntu-latest
     needs: [detect-changes, build-packages]
     if: |
-      github.repository == '${{ github.repository }}' &&
+      github.repository == 'metal3-community/ironic-packages' &&
       (github.ref == 'refs/heads/main' ||
        (github.event_name == 'pull_request' &&
         github.event.action == 'closed' &&
@@ -313,10 +308,13 @@ jobs:
       - name: SignIn ORAS
         run: |
           oras login ghcr.io -u ${{ github.actor }} -p "${{ secrets.GITHUB_TOKEN }}"
-      - name: Pull signing keys from registry
+      - name: Write signing key from secret
+        env:
+          MELANGE_SIGNING_KEY: ${{ secrets.MELANGE_SIGNING_KEY }}
         run: |
-          # Pull signing keys from registry
-          oras pull --allow-path-traversal ghcr.io/${{ github.repository }}:signing-keys --output ${{ github.workspace }}/
+          printf '%s\n' "$MELANGE_SIGNING_KEY" > "${{ env.SIGNING_KEY_PATH }}"
+          chmod 600 "${{ env.SIGNING_KEY_PATH }}"
+          openssl rsa -in "${{ env.SIGNING_KEY_PATH }}" -pubout -out "${{ env.SIGNING_KEY_PATH }}.pub"
       - name: Pull all packages from registry
         run: |
           mkdir -p packages
@@ -336,11 +334,6 @@ jobs:
           done
       - name: Setup Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-      - name: Move signing keys
-        continue-on-error: true
-        run: |
-          mv ${{ env.SIGNING_KEY_PATH }} ./packages/
-          mv ${{ env.SIGNING_KEY_PATH }}.pub ./packages/
       - name: Organize repository structure
         run: |
           mkdir -p repository
@@ -357,147 +350,73 @@ jobs:
               mkdir -p "repository/${distro}/${target_arch}"
             done
           done
-      - name: Generate repository metadata
+      - name: Install melange
         run: |
-          # Create index.html for the repository
-          cat > repository/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Metal3 Ironic APK Repository</title>
-              <style>
-                  body { font-family: Arial, sans-serif; margin: 40px; }
-                  .container { max-width: 800px; margin: 0 auto; }
-                  .repo-url { background: #f4f4f4; padding: 15px; border-radius: 5px; margin: 20px 0; font-family: monospace; }
-                  .distro { margin: 30px 0; }
-                  .arch-list { margin-left: 20px; }
-                  .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
-                  a { color: #0366d6; text-decoration: none; }
-                  a:hover { text-decoration: underline; }
-              </style>
-          </head>
-          <body>
-              <div class="container">
-                  <h1>Metal3 Ironic APK Repository</h1>
-                  <p>This repository contains APK packages for OpenStack Ironic and its dependencies, built for both Alpine Linux and Wolfi.</p>
-
-                  <div class="warning">
-                      <strong>⚠️ Note:</strong> This is an unofficial repository. Use at your own discretion.
-                  </div>
-
-                  <h2>Available Distributions</h2>
-          EOF
-
-          for distro in alpine wolfi; do
-            echo "        <div class='distro'>" >> repository/index.html
-            echo "          <h3>$(echo $distro | tr '[:lower:]' '[:upper:]')</h3>" >> repository/index.html
-            echo "          <div class='arch-list'>" >> repository/index.html
-
-            for target_arch in x86_64 aarch64; do
-              if [[ -d "repository/${distro}/${target_arch}" ]] && [[ $(ls -1 repository/${distro}/${target_arch}/*.apk 2>/dev/null | wc -l) -gt 0 ]]; then
-                echo "            <p><a href='./${distro}/${target_arch}/'>${target_arch}</a> - $(ls -1 repository/${distro}/${target_arch}/*.apk 2>/dev/null | wc -l) packages</p>" >> repository/index.html
-              fi
-            done
-
-            echo "          </div>" >> repository/index.html
-            echo "        </div>" >> repository/index.html
-          done
-
-          cat >> repository/index.html << 'EOF'
-
-                  <h2>Repository URLs</h2>
-                  <p>To use this repository, add the following URLs to your APK configuration:</p>
-
-                  <div class="repo-url">
-                  Alpine: https://metal3-community.github.io/ironic-packages/alpine<br>
-                  Wolfi: https://metal3-community.github.io/ironic-packages/wolfi<br>
-                  </div>
-
-                  <h2>Usage</h2>
-                  <p>Add the repository to your APK configuration:</p>
-                  <div class="repo-url">
-                  echo "https://metal3-community.github.io/ironic-packages/alpine" >> /etc/apk/repositories<br>
-                  apk update
-                  </div>
-
-                  <p>Last updated: ${{ github.event.repository.updated_at}}</p>
-                  <p>Source: <a href="https://github.com/${{ github.repository }}">github.com/${{ github.repository }}</a></p>
-              </div>
-          </body>
-          </html>
-          EOF
-
-          # Create directory index files for each distribution/architecture
+          curl -sL "https://github.com/chainguard-dev/melange/releases/download/v${{ env.MELANGE_VERSION }}/melange_${{ env.MELANGE_VERSION }}_linux_amd64.tar.gz" \
+          | tar xvz --strip-components=1
+          sudo mv melange /usr/local/bin/
+          chmod +x /usr/local/bin/melange
+      - name: Re-sign package indexes
+        run: |
+          # Regenerate and sign every APKINDEX with the current key so the
+          # published repository always verifies against the published public
+          # key, regardless of which run originally built the packages.
           for distro in alpine wolfi; do
             for target_arch in x86_64 aarch64; do
-              if [[ -d "repository/${distro}/${target_arch}" ]]; then
-                cat > "repository/${distro}/${target_arch}/index.html" << EOF
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>${distro^} ${target_arch} - Metal3 Ironic APK Repository</title>
-              <style>
-                  body { font-family: Arial, sans-serif; margin: 40px; }
-                  .container { max-width: 800px; margin: 0 auto; }
-                  table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                  th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-                  th { background-color: #f2f2f2; }
-                  .back-link { margin-bottom: 20px; }
-                  a { color: #0366d6; text-decoration: none; }
-                  a:hover { text-decoration: underline; }
-              </style>
-          </head>
-          <body>
-              <div class="container">
-                  <div class="back-link">
-                      <a href="../../">← Back to main repository</a>
-                  </div>
-
-                  <h1>${distro^} ${target_arch} Packages</h1>
-
-                  <table>
-                      <thead>
-                          <tr>
-                              <th>Package</th>
-                              <th>Size</th>
-                              <th>Modified</th>
-                          </tr>
-                      </thead>
-                      <tbody>
-          EOF
-
-                if [[ -f "repository/${distro}/${target_arch}/APKINDEX.tar.gz" ]]; then
-                  file="APKINDEX.tar.gz"
-                  size=$(stat -f%z "repository/${distro}/${target_arch}/${file}" 2>/dev/null || stat -c%s "repository/${distro}/${target_arch}/${file}" 2>/dev/null || echo "0")
-                  mod_time=$(stat -f%Sm "repository/${distro}/${target_arch}/${file}" 2>/dev/null || stat -c%y "repository/${distro}/${target_arch}/${file}" 2>/dev/null || echo "unknown")
-                  echo "                          <tr><td><a href='./${file}'>${file}</a></td><td>${size} bytes</td><td>${mod_time}</td></tr>" >> "repository/${distro}/${target_arch}/index.html"
-                fi
-
-                for file in repository/${distro}/${target_arch}/*.apk; do
-                  if [[ -f "$file" ]]; then
-                    filename=$(basename "$file")
-                    size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
-                    mod_time=$(stat -f%Sm "$file" 2>/dev/null || stat -c%y "$file" 2>/dev/null || echo "unknown")
-                    echo "                          <tr><td><a href='./${filename}'>${filename}</a></td><td>${size} bytes</td><td>${mod_time}</td></tr>" >> "repository/${distro}/${target_arch}/index.html"
-                  fi
-                done
-
-                cat >> "repository/${distro}/${target_arch}/index.html" << 'EOF'
-                      </tbody>
-                  </table>
-
-                  <p>Last updated: ${{ github.event.repository.updated_at}}</p>
-              </div>
-          </body>
-          </html>
-          EOF
+              dir="repository/${distro}/${target_arch}"
+              if compgen -G "$dir/*.apk" > /dev/null; then
+                (cd "$dir" && melange index \
+                  --signing-key "${GITHUB_WORKSPACE}/${{ env.SIGNING_KEY_PATH }}" \
+                  -o APKINDEX.tar.gz *.apk)
+                echo "Re-signed index for ${distro}/${target_arch}"
               fi
             done
           done
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Build site data from melange configs and APKINDEX
+        run: |
+          # Package metadata (description, license) comes from the melange
+          # configs; availability (distro/arch/version) from the re-signed
+          # APKINDEX files. The raw packages are linked into site/static.
+          python3 -m pip install --quiet pyyaml
+          python3 scripts/build-site-data.py \
+            --configs-dir . \
+            --repository-dir repository \
+            --site-dir site \
+            --pubkey "${{ env.SIGNING_KEY_PATH }}.pub" \
+            --distros alpine,wolfi \
+            --arches x86_64,aarch64
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Install Tailwind CSS
+        working-directory: site
+        run: npm ci
+      - name: Install Hugo
+        env:
+          HUGO_VERSION: 0.165.0
+        run: |
+          curl -sSL "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin hugo
+          hugo version
+      - name: Build site (Hugo + Tailwind CSS)
+        env:
+          HUGO_ENVIRONMENT: production
+        run: hugo --gc --minify --source site
+      - name: Verify no private key in artifact
+        run: |
+          # Belt-and-braces: the private key must never reach the Pages site.
+          if find repository -name '*.rsa' -o -name '*.pem' | grep -q .; then
+            echo "::error::Private key material found in the Pages artifact:"
+            find repository -name '*.rsa' -o -name '*.pem'
+            exit 1
+          fi
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

@@ -1,0 +1,25 @@
+baseURL = "https://metal3-community.github.io/ironic-packages/"
+title = "Metal3 Ironic APK Repository"
+
+[languages.en]
+  label = "English"
+  locale = "en-US"
+  weight = 1
+enableRobotsTXT = true
+
+# The home page also renders index.json, the client-side search index.
+[outputs]
+  home = ["HTML", "JSON"]
+
+[params]
+  description = "APK packages for OpenStack Ironic and its dependencies, built for Alpine Linux and Wolfi."
+  repo = "metal3-community/ironic-packages"
+  distros = ["alpine", "wolfi"]
+  arches = ["x86_64", "aarch64"]
+
+[markup.goldmark.renderer]
+  unsafe = true
+
+# Allow Hugo Pipes to invoke the Tailwind CSS CLI (in addition to the defaults).
+[security.exec]
+  allow = ['^(dart-)?sass$', '^go$', '^git$', '^node$', '^npx$', '^postcss$', '^tailwindcss$']

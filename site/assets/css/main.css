@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Tailwind v4 scans these template sources for class names. */
+@source "../../layouts";
+
+@theme {
+  --font-mono: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+}

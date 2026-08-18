@@ -1,0 +1,24 @@
+{{- $list := slice -}}
+{{- range $name, $pkg := hugo.Data.packages -}}
+  {{- $versions := slice -}}
+  {{- range $pkg.versions -}}
+    {{- $versions = $versions | append (dict
+        "version" .version
+        "distro" .distro
+        "arch" .arch
+        "size" .size
+        "href" (.file | relURL)
+    ) -}}
+  {{- end -}}
+  {{- $list = $list | append (dict
+      "name" $pkg.name
+      "description" $pkg.description
+      "license" $pkg.license
+      "url" $pkg.url
+      "latest" $pkg.latest
+      "distros" $pkg.distros
+      "arches" $pkg.arches
+      "versions" $versions
+  ) -}}
+{{- end -}}
+{{- $list | jsonify -}}

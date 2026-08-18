@@ -1,0 +1,10 @@
+{{/* Install/usage snippet. Optional context: a distro string. */}}
+{{ $distro := . | default "wolfi" }}
+{{ $base := strings.TrimSuffix "/" site.BaseURL }}
+<div class="rounded-lg border border-slate-200 bg-white p-5">
+  <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Usage</h3>
+  <p class="mb-2 text-sm text-slate-600">Install the signing key and add the repository:</p>
+  <pre class="overflow-x-auto rounded-md bg-slate-900 p-4 text-xs leading-relaxed text-slate-100"><code>wget -P /etc/apk/keys {{ $base }}/melange.rsa.pub
+echo "{{ $base }}/{{ $distro }}/$(uname -m)" >> /etc/apk/repositories
+apk update</code></pre>
+</div>

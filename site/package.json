@@ -1,0 +1,10 @@
+{
+  "name": "ironic-packages-site",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Hugo + Tailwind CSS site for the Metal3 Ironic APK repository",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.0",
+    "tailwindcss": "^4.1.0"
+  }
+}

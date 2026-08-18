@@ -1,0 +1,14 @@
+<header class="border-b border-slate-200 bg-white">
+  <div class="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
+    <a href="{{ "" | relLangURL }}" class="flex items-center gap-2 font-semibold text-slate-900">
+      <span class="text-xl">📦</span>
+      <span>{{ site.Title }}</span>
+    </a>
+    <nav class="flex items-center gap-4 text-sm">
+      {{ range site.Params.distros }}
+        <a href="{{ . | relURL }}" class="text-slate-600 hover:text-slate-900">{{ . }}</a>
+      {{ end }}
+      <a href="https://github.com/{{ site.Params.repo }}" class="text-slate-600 hover:text-slate-900">GitHub</a>
+    </nav>
+  </div>
+</header>

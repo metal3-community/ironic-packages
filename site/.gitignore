@@ -1,0 +1,16 @@
+# Hugo build output and caches
+/public/
+/resources/
+.hugo_build.lock
+hugo_stats.json
+
+# Node
+/node_modules/
+
+# Generated at build time by scripts/build-site-data.py
+/data/packages.yaml
+/content/alpine/
+/content/wolfi/
+/static/alpine/
+/static/wolfi/
+/static/melange.rsa.pub

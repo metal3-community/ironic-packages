@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="{{ site.Language.Lang | default "en" }}" class="scroll-smooth">
+<head>
+  {{ partial "head.html" . }}
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 antialiased flex flex-col">
+  {{ partial "header.html" . }}
+  <main class="mx-auto w-full max-w-5xl grow px-4 py-8">
+    {{ block "main" . }}{{ end }}
+  </main>
+  {{ partial "footer.html" . }}
+  {{ block "scripts" . }}{{ end }}
+</body>
+</html>
