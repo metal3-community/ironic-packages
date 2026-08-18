@@ -2,7 +2,7 @@
 package:
   name: py3-pint
   description: Physical quantities module
-  version: 0.24.4
+  version: 0.25.3
   epoch: 1
   copyright:
     - license: BSD-2-Clause

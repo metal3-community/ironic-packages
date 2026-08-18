@@ -2,8 +2,8 @@
 package:
   name: ipmitool
   version: 1.8.19
-  epoch: 1
-  description: An open-source tool for controlling IPMI-enabled systems (statically linked)
+  epoch: 0
+  description: An open-source tool for controlling IPMI-enabled systems
   copyright:
     - license: BSD-3-Clause
   dependencies:
@@ -17,24 +17,22 @@ var-transforms:
     replace: _
     to: version_macro
 
-vars:
-  # Static libcrypto for the lanplus interface, built in-pipeline because
-  # neither Wolfi nor Alpine ship a static OpenSSL usable from both distros.
-  openssl-version: 3.5.7
-  openssl-sha256: a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8
-
 environment:
   contents:
     packages:
+      - acl
+      - wget
+      - readline-dev
+      - libtool
       - busybox
       - build-base
-      - wget
       - ca-certificates-bundle
       - autoconf
       - automake
-      - libtool
       - linux-headers
-      - perl
+      # lanplus needs libcrypto; the git tag has no ./configure so ./bootstrap
+      # (autoreconf) runs at build time.
+      - openssl-dev
 
 pipeline:
   - uses: git-checkout
@@ -42,17 +40,6 @@ pipeline:
       repository: https://github.com/ipmitool/ipmitool
       tag: IPMITOOL_${{vars.version_macro}}
       expected-commit: 19d78782d795d0cf4ceefe655f616210c9143e62
-  - name: Build static libcrypto (OpenSSL)
-    runs: |
-      mkdir -p /tmp/openssl-src
-      cd /tmp/openssl-src
-      wget -T10 --tries=5 https://github.com/openssl/openssl/releases/download/openssl-${{vars.openssl-version}}/openssl-${{vars.openssl-version}}.tar.gz
-      echo "${{vars.openssl-sha256}}  openssl-${{vars.openssl-version}}.tar.gz" | sha256sum -c -
-      tar -xzf openssl-${{vars.openssl-version}}.tar.gz
-      cd openssl-${{vars.openssl-version}}
-      ./config --prefix=/usr/local --libdir=lib no-shared no-module no-dso no-tests
-      make -j"$(nproc)" build_libs
-      make install_dev
   - name: Bootstrap autotools
     runs: |
       # The git tag does not ship a generated ./configure script.
@@ -62,7 +49,7 @@ pipeline:
       opts: |
         --bindir=/usr/bin \
         --enable-ipmievd \
-        --disable-ipmishell \
+        --enable-ipmishell \
         --enable-intf-lan \
         --enable-intf-lanplus \
         --enable-intf-open \
@@ -71,34 +58,21 @@ pipeline:
         --disable-intf-lipmi \
         --disable-intf-bmc \
         --disable-internal-md5 \
-        --with-kerneldir=/usr \
-        CFLAGS="-O2 -I/usr/local/include" \
-        LDFLAGS="-static -L/usr/local/lib" \
-        LIBS="-lpthread"
+        --with-kerneldir=/usr
   - uses: autoconf/make
   - uses: autoconf/make-install
   - runs: |
       mv ${{targets.destdir}}/usr/sbin/* ${{targets.destdir}}/usr/bin/
       rm -rf ${{targets.destdir}}/usr/sbin
-  - name: Verify static linkage
-    runs: |
-      for bin in ${{targets.destdir}}/usr/bin/*; do
-        if readelf -d "$bin" 2>/dev/null | grep -q 'NEEDED'; then
-          echo "ERROR: $bin is dynamically linked"
-          readelf -d "$bin"
-          exit 1
-        fi
-      done
 
 test:
   environment: {}
   pipeline:
     - runs: |
+        ipmitool --version
         ipmitool -V
-
 update:
   enabled: true
-
   version-transform:
     - match: _
       replace: .
