@@ -145,10 +145,23 @@ def collect_availability(repo_dir: Path, distros: list[str], arches: list[str]) 
                     "arch": arch,
                     "version": version,
                     "size": int(rec.get("S", 0) or 0),
+                    "date": _build_date(rec.get("t")),
                     "file": f"{distro}/{arch}/{filename}",
                 }
                 avail.setdefault(name, []).append(entry)
     return avail
+
+
+def _build_date(ts: str | None) -> str:
+    try:
+        seconds = int(ts or 0)
+    except ValueError:
+        return ""
+    if seconds <= 0:
+        return ""
+    from datetime import datetime, timezone
+
+    return datetime.fromtimestamp(seconds, tz=timezone.utc).strftime("%Y-%m-%d")
 
 
 def merge(meta: dict[str, dict], avail: dict[str, list[dict]]) -> dict[str, dict]:
@@ -161,11 +174,18 @@ def merge(meta: dict[str, dict], avail: dict[str, list[dict]]) -> dict[str, dict
         )
         distinct = sorted({v["version"] for v in versions})
         latest = m.get("melange_version") or (distinct[-1] if distinct else "")
+        config = m.get("config", "")
+        recipe = (
+            f"https://github.com/metal3-community/ironic-packages/blob/main/{config}"
+            if config
+            else ""
+        )
         packages[name] = {
             "name": name,
             "description": m.get("description", ""),
             "license": m.get("license", ""),
             "url": m.get("url", ""),
+            "recipe": recipe,
             "latest": latest,
             "distros": sorted({v["distro"] for v in versions}),
             "arches": sorted({v["arch"] for v in versions}),

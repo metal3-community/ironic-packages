@@ -1,15 +1,11 @@
 baseURL = "https://metal3-community.github.io/ironic-packages/"
 title = "Metal3 Ironic APK Repository"
+enableRobotsTXT = true
 
 [languages.en]
   label = "English"
   locale = "en-US"
   weight = 1
-enableRobotsTXT = true
-
-# The home page also renders index.json, the client-side search index.
-[outputs]
-  home = ["HTML", "JSON"]
 
 [params]
   description = "APK packages for OpenStack Ironic and its dependencies, built for Alpine Linux and Wolfi."

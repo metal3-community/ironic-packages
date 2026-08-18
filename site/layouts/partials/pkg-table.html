@@ -1,0 +1,43 @@
+{{- /* Flat package table. Context: dict "rows" (slice of row dicts). */ -}}
+{{- $rows := .rows -}}
+<div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+  <table class="w-full text-left text-sm">
+    <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+      <tr>
+        <th class="px-4 py-3">Package</th>
+        <th class="px-4 py-3">Version</th>
+        <th class="px-4 py-3">License</th>
+        <th class="px-4 py-3">Distro</th>
+        <th class="px-4 py-3">Arch</th>
+        <th class="px-4 py-3 text-right">Size</th>
+        <th class="px-4 py-3">Build date</th>
+        <th class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody id="pkg-rows" class="divide-y divide-slate-100">
+      {{- range $rows }}
+      <tr class="pkg-row hover:bg-slate-50"
+          data-search="{{ .name }} {{ .description }}"
+          data-distro="{{ .distro }}"
+          data-arch="{{ .arch }}">
+        <td class="px-4 py-3">
+          <a class="font-medium text-slate-900 hover:text-blue-700 hover:underline"{{ with .recipe }} href="{{ . }}"{{ end }}>{{ .name }}</a>
+          {{- with .description }}
+          <div class="max-w-md truncate text-xs text-slate-500" title="{{ . }}">{{ . }}</div>
+          {{- end }}
+        </td>
+        <td class="px-4 py-3 font-mono text-xs text-slate-700">{{ .version }}</td>
+        <td class="px-4 py-3 text-xs text-slate-600">{{ .license | default "—" }}</td>
+        <td class="px-4 py-3"><span class="rounded bg-slate-100 px-2 py-0.5 text-xs capitalize text-slate-600">{{ .distro }}</span></td>
+        <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ .arch }}</td>
+        <td class="px-4 py-3 text-right font-mono text-xs text-slate-500">{{ if .size }}{{ div .size 1024 }} KB{{ else }}—{{ end }}</td>
+        <td class="px-4 py-3 text-xs text-slate-500">{{ .date | default "—" }}</td>
+        <td class="px-4 py-3 text-right">
+          <a class="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100" href="{{ .href }}">Download</a>
+        </td>
+      </tr>
+      {{- end }}
+    </tbody>
+  </table>
+</div>
+<p id="pkg-count" class="mt-3 text-sm text-slate-500" data-total="{{ len $rows }}">{{ len $rows }} packages</p>

@@ -11,53 +11,28 @@
   </nav>
 
   {{ if $arch }}
-    {{/* Architecture page: enumerate the packages published for this distro/arch. */}}
+    {{/* Architecture page: the package table scoped to this distro/arch. */}}
     <h1 class="text-2xl font-bold text-slate-900">{{ $distro }} <span class="text-slate-400">/</span> {{ $arch }}</h1>
 
     {{ $rows := slice }}
     {{ range $name, $pkg := hugo.Data.packages }}
       {{ range $pkg.versions }}
         {{ if and (eq .distro $distro) (eq .arch $arch) }}
-          {{ $rows = $rows | append (dict "pkg" $pkg "v" .) }}
+          {{ $rows = $rows | append (dict
+            "name" $pkg.name "description" $pkg.description "license" $pkg.license
+            "recipe" $pkg.recipe "distro" .distro "arch" .arch "version" .version
+            "size" .size "date" .date "href" (.file | relURL)) }}
         {{ end }}
       {{ end }}
     {{ end }}
 
-    <p class="mt-1 text-sm text-slate-500">{{ len $rows }} packages ·
-      <a class="text-blue-600 hover:underline" href="{{ (printf "%s/%s/APKINDEX.tar.gz" $distro $arch) | relURL }}">APKINDEX.tar.gz</a>
-    </p>
-
-    <div class="mt-6 overflow-x-auto rounded-lg border border-slate-200 bg-white">
-      <table class="w-full text-left text-sm">
-        <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-          <tr>
-            <th class="px-4 py-3">Package</th>
-            <th class="px-4 py-3">Version</th>
-            <th class="px-4 py-3">License</th>
-            <th class="px-4 py-3 text-right">Size</th>
-            <th class="px-4 py-3"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {{ range $rows }}
-            {{ $pkg := .pkg }}{{ $v := .v }}
-            <tr class="hover:bg-slate-50">
-              <td class="px-4 py-3">
-                <div class="font-medium text-slate-900">{{ $pkg.name }}</div>
-                {{ with $pkg.description }}<div class="max-w-md text-xs text-slate-500">{{ . }}</div>{{ end }}
-              </td>
-              <td class="px-4 py-3 font-mono text-xs text-slate-700">{{ $v.version }}</td>
-              <td class="px-4 py-3 text-xs text-slate-600">{{ $pkg.license | default "—" }}</td>
-              <td class="px-4 py-3 text-right font-mono text-xs text-slate-500">{{ if $v.size }}{{ lang.FormatNumberCustom 0 (div (float $v.size) 1024) }} KB{{ else }}—{{ end }}</td>
-              <td class="px-4 py-3 text-right">
-                <a class="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
-                   href="{{ $v.file | relURL }}">Download</a>
-              </td>
-            </tr>
-          {{ end }}
-        </tbody>
-      </table>
+    <div class="my-4">
+      <input id="f-name" type="search" autocomplete="off" placeholder="Filter packages…"
+        class="w-full max-w-md rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+      <a class="ml-2 text-sm text-blue-600 hover:underline" href="{{ (printf "%s/%s/APKINDEX.tar.gz" $distro $arch) | relURL }}">APKINDEX.tar.gz</a>
     </div>
+
+    {{ partial "pkg-table.html" (dict "rows" $rows) }}
 
     <div class="mt-8">{{ partial "usage.html" $distro }}</div>
 
@@ -74,12 +49,20 @@
     </div>
 
   {{ else }}
-    {{/* Fallback section listing. */}}
     <h1 class="text-2xl font-bold text-slate-900">{{ .Title }}</h1>
     <ul class="mt-4 space-y-2">
       {{ range .Pages }}
         <li><a class="text-blue-600 hover:underline" href="{{ .RelPermalink }}">{{ .Title }}</a></li>
       {{ end }}
     </ul>
+  {{ end }}
+{{ end }}
+
+{{ define "scripts" }}
+  {{ if .Params.arch }}
+    {{ with resources.Get "js/search.js" }}
+      {{ $js := . | js.Build (dict "minify" hugo.IsProduction) }}
+      <script src="{{ $js.RelPermalink }}" defer></script>
+    {{ end }}
   {{ end }}
 {{ end }}
