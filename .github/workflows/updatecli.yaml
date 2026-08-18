@@ -1,4 +1,4 @@
-name: Sync package versions with OpenStack
+name: Sync package versions from PyPI
 on:
   schedule:
     # Run daily at 6 AM UTC
@@ -29,68 +29,43 @@ jobs:
         uses: updatecli/updatecli-action@41b9c8d707830a9daebaeaa84c1b62d60b779564 # v3.6.0
         with:
           version: v0.120.1
-      - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
       - name: Install prerequisites
         run: |
-          python3 -c 'import packaging' 2>/dev/null \
-            || python3 -m pip install --user packaging \
-            || python3 -m pip install --user --break-system-packages packaging
-          command -v yq >/dev/null || {
-            sudo curl -sSfL -o /usr/local/bin/yq \
-              https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-            sudo chmod +x /usr/local/bin/yq
-          }
-      - name: Read pinned OpenStack series
-        id: pin
-        run: |
-          echo "series=$(yq -r '.openstack.series' updatecli/values.yaml)" >> "$GITHUB_OUTPUT"
-      - name: Regenerate dependency lock
-        if: github.event.inputs.dry_run != 'true'
-        run: python3 scripts/ironic-deps.py lock
-      - name: Sync package set from the dependency lock
-        if: github.event.inputs.dry_run != 'true'
-        run: python3 scripts/ironic-deps.py sync
+          python3 -c 'import yaml' 2>/dev/null \
+            || python3 -m pip install --user pyyaml \
+            || python3 -m pip install --user --break-system-packages pyyaml
+      - name: Generate updatecli manifest from the melange configs
+        run: python3 scripts/gen-updatecli.py
       - name: updatecli diff
         if: github.event.inputs.dry_run == 'true'
-        run: updatecli diff --config updatecli/updatecli.d --values updatecli/values.yaml
+        run: updatecli diff --config updatecli/updatecli.d
       - name: updatecli apply
         if: github.event.inputs.dry_run != 'true'
-        run: updatecli apply --config updatecli/updatecli.d --values updatecli/values.yaml
-      - name: Ironic dependency graph report
-        run: python3 scripts/ironic-deps.py report >> "$GITHUB_STEP_SUMMARY" || true
+        run: updatecli apply --config updatecli/updatecli.d
       - name: Create Pull Request
         if: github.event.inputs.dry_run != 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: sync package versions with OpenStack ${{ steps.pin.outputs.series }}"
-          title: "chore: sync package versions with OpenStack ${{ steps.pin.outputs.series }}"
+          commit-message: "chore: update package versions from PyPI"
+          title: "chore: update package versions from PyPI"
           body: |
-            ## Coordinated package version sync
+            ## Package version updates
 
-            Updates all package definitions to the versions OpenStack releases
-            and tests together for the **${{ steps.pin.outputs.series }}** series
-            (pinned in `updatecli/values.yaml`):
+            updatecli bumped each `py3-*.yaml` to the latest release of its
+            corresponding PyPI project. The manifest
+            (`updatecli/updatecli.d/pypi.yaml`) is generated from the melange
+            configs by `scripts/gen-updatecli.py`; each source is a `pypi`
+            kind keyed by the config filename, and each target rewrites
+            `package.version`.
 
-            1. `pyproject.toml` is regenerated: services at their latest
-               series release (from
-               [openstack/releases](https://opendev.org/openstack/releases))
-               plus ironic's `driver-requirements.txt` ranges.
-            2. `uv pip compile`, constrained by the series'
-               [upper-constraints.txt](https://releases.openstack.org/constraints/upper/${{ steps.pin.outputs.series }}),
-               resolves it into `requirements.lock` — the full transitive
-               dependency set at exact, mutually-compatible versions.
-            3. Every `py3-*.yaml` is synced to its locked version; new locked
-               dependencies get a scaffolded definition (review before
-               merging), and packages that leave the lock are dropped from
-               the sync list.
-
-            See the workflow run summary for the full coverage report.
+            > **Note:** review version bumps before merging — PyPI "latest"
+            > does not guarantee that co-installed OpenStack packages remain
+            > mutually compatible.
 
             ---
             *This PR was created automatically by the updatecli workflow.*
-          branch: update/openstack-${{ steps.pin.outputs.series }}
+          branch: update/pypi-versions
           delete-branch: true
           labels: |
             automated

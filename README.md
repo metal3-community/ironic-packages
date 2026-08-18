@@ -59,48 +59,38 @@ Packages are automatically built using [Melange](https://github.com/chainguard-d
 
 ### Automated Package Updates
 
-All package versions derive from a single pin — the **OpenStack release
-series** in [`updatecli/values.yaml`](updatecli/values.yaml) — through a
-fully-resolved dependency lock:
+Each `py3-*.yaml` tracks the latest release of its corresponding
+[PyPI](https://pypi.org/) project via [updatecli](https://www.updatecli.io/):
 
-1. [`scripts/ironic-deps.py`](scripts/ironic-deps.py) `lock` regenerates
-   [`pyproject.toml`](pyproject.toml): the packaged services pinned at their
-   latest release for the series (from
-   [openstack/releases](https://opendev.org/openstack/releases)) plus
-   ironic's `driver-requirements.txt` ranges. `uv pip compile`, constrained
-   by the series'
-   [`upper-constraints.txt`](https://releases.openstack.org/constraints/upper/2025.2),
-   resolves it into [`requirements.lock`](requirements.lock) — the complete
-   transitive dependency set at exact versions, proven mutually compatible
-   by a real resolver and matching what OpenStack tests together.
-1. `ironic-deps.py sync` makes the repo match the lock: it regenerates the
-   `dependencies:` list in `updatecli/values.yaml` and scaffolds a
-   `py3-<name>.yaml` for any locked package not listed in `externalPackages`
-   (the human-curated list of packages provided by the upstream Alpine/Wolfi
-   repositories).
-1. [updatecli](https://www.updatecli.io/) syncs every `py3-*.yaml` to its
-   version in the committed lock (offline — no network at apply time).
+1. [`scripts/gen-updatecli.py`](scripts/gen-updatecli.py) scans the
+   `py3-*.yaml` configs and generates
+   [`updatecli/updatecli.d/pypi.yaml`](updatecli/updatecli.d/pypi.yaml) — one
+   `kind: pypi` source plus a `kind: yaml` target per package, keyed by the
+   config filename (e.g. `py3-requests` → PyPI project `requests`; PyPI
+   resolves dashed names under PEP 503, so `oslo-config` finds `oslo.config`).
+1. `updatecli apply` rewrites each config's `package.version` to the latest
+   PyPI release.
 
-The [`updatecli.yaml`](.github/workflows/updatecli.yaml) workflow runs daily
-and opens a single PR with the coordinated result, including the
-`pyproject.toml`/`requirements.lock` diff for review; `ironic-deps.py report`
-publishes a coverage report in the run summary. Scaffolded packages are
-starting points — review the license and test import before merging.
+The [`updatecli.yaml`](.github/workflows/updatecli.yaml) workflow runs daily,
+regenerates the manifest, and opens a single PR with the version bumps.
 
-To move the whole package set to a new OpenStack release, change
-`openstack.series` in `updatecli/values.yaml` (e.g. `"2025.2"` → `"2026.1"`)
-and let the workflow (or a local run) do the rest. `openstack.lockPython`
-should track the Python version shipped by the target images, since
-environment markers can change the resolved set.
+> **Note:** "latest from PyPI" does not guarantee that co-installed OpenStack
+> packages (ironic, oslo.\*, keystoneauth1, …) remain mutually compatible —
+> that is what OpenStack's
+> [upper-constraints](https://releases.openstack.org/constraints/upper/2025.2)
+> exist to enforce. Review version bumps before merging.
 
-To run the full flow locally (requires `uv`, `updatecli`, `curl`, `yq`, and
-Python with the `packaging` module):
+To run the flow locally (requires `updatecli` and Python with `pyyaml`):
 
 ```bash
-python3 scripts/ironic-deps.py lock
-python3 scripts/ironic-deps.py sync
-updatecli apply --config updatecli/updatecli.d --values updatecli/values.yaml
+python3 scripts/gen-updatecli.py
+updatecli diff  --config updatecli/updatecli.d   # preview
+updatecli apply --config updatecli/updatecli.d   # rewrite versions
 ```
+
+To add a package, drop a new `py3-<name>.yaml` in and rerun
+`gen-updatecli.py`; if its PyPI project name is not simply `<name>`, add an
+entry to `PYPI_NAME_OVERRIDES` in the script.
 
 ### Manual Building
 
