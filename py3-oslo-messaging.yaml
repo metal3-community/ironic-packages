@@ -2,7 +2,7 @@
 package:
   name: py3-oslo-messaging
   description: Oslo Messaging API
-  version: 17.1.0
+  version: 18.2.0
   epoch: 1
   copyright:
     - license: Apache-2.0

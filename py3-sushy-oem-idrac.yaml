@@ -2,7 +2,7 @@
 package:
   name: py3-sushy-oem-idrac
   description: Sushi extension package that aims at adding Dell EMC BMC to the tree of sushy Redfish resources.
-  version: 5.0.0
+  version: 6.0.0
   epoch: 1
   copyright:
     - license: Apache-2.0

@@ -2,7 +2,7 @@
 package:
   name: py3-zeroconf
   description: A pure python implementation of multicast DNS service discovery
-  version: 0.147.0
+  version: 0.150.0
   epoch: 1
   copyright:
     - license: LGPL-2.0
