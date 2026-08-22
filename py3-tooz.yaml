@@ -2,7 +2,7 @@
 package:
   name: py3-tooz
   description: Coordination library for distributed systems.
-  version: 7.0.0
+  version: 9.0.1
   epoch: 1
   copyright:
     - license: Apache-2.0

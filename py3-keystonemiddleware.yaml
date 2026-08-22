@@ -2,7 +2,7 @@
 package:
   name: py3-keystonemiddleware
   description: Middleware for OpenStack Identity
-  version: 10.12.1
+  version: 13.0.0
   epoch: 2
   copyright:
     - license: Apache-2.0

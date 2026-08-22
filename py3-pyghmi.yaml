@@ -2,7 +2,7 @@
 package:
   name: py3-pyghmi
   description: This is a pure python implementation of IPMI protocol.
-  version: 1.6.2
+  version: 1.6.19
   epoch: 1
   copyright:
     - license: Apache-2.0

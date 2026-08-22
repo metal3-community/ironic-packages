@@ -2,7 +2,7 @@
 package:
   name: py3-pysnmp
   description: This is a pure python implementation of the v1/v2c/v3 SNMP engine
-  version: 7.1.21
+  version: 7.1.29
   epoch: 1
   copyright:
     - license: BSD-2-Clause

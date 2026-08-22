@@ -2,7 +2,7 @@
 package:
   name: py3-ironic-python-agent
   description: OpenStack Bare Metal Provisioning Agent
-  version: 11.2.0
+  version: 12.0.0
   epoch: 1
   copyright:
     - license: Apache-2.0

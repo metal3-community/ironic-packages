@@ -2,7 +2,7 @@
 package:
   name: py3-python-keystoneclient
   description: Client Library for OpenStack Identity
-  version: 5.7.0
+  version: 5.8.0
   epoch: 1
   copyright:
     - license: Apache-2.0
