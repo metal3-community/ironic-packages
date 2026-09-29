@@ -2,7 +2,7 @@
 package:
   name: py3-oslo-service
   description: oslo.service library
-  version: 4.3.0
+  version: 4.8.0
   epoch: 1
   copyright:
     - license: Apache-2.0

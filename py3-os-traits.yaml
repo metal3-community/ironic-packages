@@ -2,7 +2,7 @@
 package:
   name: py3-os-traits
   description: A library containing standardized trait strings
-  version: 3.5.0
+  version: 3.9.0
   epoch: 1
   copyright:
     - license: Apache-2.0
