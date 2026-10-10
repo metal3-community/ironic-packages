@@ -2,7 +2,7 @@
 package:
   name: py3-oslo-serialization
   description: Oslo Serialization library
-  version: 5.8.0
+  version: 5.11.0
   epoch: 1
   copyright:
     - license: Apache-2.0

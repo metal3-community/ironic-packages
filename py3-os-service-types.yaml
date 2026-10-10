@@ -2,7 +2,7 @@
 package:
   name: py3-os-service-types
   description: Python library for consuming OpenStack sevice-types-authority data
-  version: 1.8.0
+  version: 1.9.0
   epoch: 1
   copyright:
     - license: Apache-2.0
