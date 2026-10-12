@@ -2,7 +2,7 @@
 package:
   name: py3-oslo-middleware
   description: Oslo Middleware library
-  version: 6.6.0
+  version: 8.2.0
   epoch: 1
   copyright:
     - license: Apache-2.0
