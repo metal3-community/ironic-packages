@@ -2,7 +2,7 @@
 package:
   name: py3-oslo-config
   description: Oslo Configuration API
-  version: 10.0.0
+  version: 10.7.0
   epoch: 1
   copyright:
     - license: Apache-2.0
