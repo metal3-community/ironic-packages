@@ -2,7 +2,7 @@
 package:
   name: py3-kombu
   description: Messaging library for Python.
-  version: 5.5.4
+  version: 5.6.2
   epoch: 1
   copyright:
     - license: BSD-2-Clause

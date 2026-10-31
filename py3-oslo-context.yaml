@@ -2,7 +2,7 @@
 package:
   name: py3-oslo-context
   description: Oslo Context library
-  version: 6.1.0
+  version: 6.5.0
   epoch: 1
   copyright:
     - license: Apache-2.0
