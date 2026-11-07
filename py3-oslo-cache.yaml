@@ -2,7 +2,7 @@
 package:
   name: py3-oslo-cache
   description: Cache storage for OpenStack projects.
-  version: 3.12.0
+  version: 4.3.0
   epoch: 2
   copyright:
     - license: Apache-2.0
