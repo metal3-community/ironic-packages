@@ -2,7 +2,7 @@
 package:
   name: py3-python-scciclient
   description: Python ServerView Common Command Interface (SCCI) Client Library
-  version: 0.16.0
+  version: 0.17.0
   epoch: 1
   copyright:
     - license: Apache-2.0
