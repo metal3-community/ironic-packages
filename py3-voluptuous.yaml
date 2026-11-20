@@ -2,7 +2,7 @@
 package:
   name: py3-voluptuous
   description: Python data validation library
-  version: 0.15.2
+  version: 0.16.0
   epoch: 1
   copyright:
     - license: BSD-2-Clause
